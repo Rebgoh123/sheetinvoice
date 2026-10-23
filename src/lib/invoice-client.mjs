@@ -143,7 +143,7 @@ function readForm() {
 }
 function persist() {
   if (googleUser) cacheAccountId = googleUser.id;
-  if (workbook) { cachedItems = workbook.savedItems; cachedDesign = normalizeDesign(workbook.design); }
+  if (workbook) { cachedItems = workbook.savedItems; cachedDesign = workbook.design; }
   const hasData = exportFormat !== 'pdf' || dirty || profileDirty || recordWorkbookId || Object.entries(business).some(([key, value]) => !SELLER_FIELDS[key].isLabel && value.trim()) || cachedItems.length || Object.values(invoice.customer).some(value => value.trim()) || invoice.items.some(item => !isBlankItem(item)) || invoice.notes.trim();
   deviceSaved = saveDevice(hasData ? { invoice, business, exportFormat, numberStart, automaticNumber, design: cachedDesign, savedItems: cachedItems, accountId: cacheAccountId, workbookId: recordWorkbookId,
     recordId, recordRevision, baseRevision, customerId, dirty, profileDirty } : null);
@@ -713,7 +713,8 @@ function renderHistory() {
   document.querySelectorAll('[data-status]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.status === historyStatus)));
   for (const record of records.slice(historyPage * 10, historyPage * 10 + 10)) {
     const saved = record.invoice, paid = saved.status === 'paid';
-    const row = $('history-row-template').content.firstElementChild.cloneNode(true); row.dataset.recordId = record.id;
+    const row = $('history-row-template').content.firstElementChild.cloneNode(true);
+    row.dataset.recordId = record.id; row.dataset.revision = record.revision;
     for (const [field, value] of Object.entries({ number: saved.number, date: displayDate(saved.date), customer: saved.customer.name,
       service: saved.items.map(item => item.description).join(', '), amount: formatMoney(invoiceTotal(saved)) })) row.querySelector(`[data-field="${field}"]`).textContent = value;
     const badge = row.querySelector('[data-field="status"]');
@@ -731,8 +732,12 @@ function renderHistory() {
 $('history-list').addEventListener('click', event => {
   const button = event.target.closest('button[data-action]');
   if (!button || googleBusy || generating || sharing) return;
-  const record = workbook?.invoices.find(record => record.id === button.closest('[data-record-id]').dataset.recordId);
-  if (!record) return;
+  const row = button.closest('[data-record-id]'), record = workbook?.invoices.find(record => record.id === row.dataset.recordId);
+  if (!record || record.revision !== row.dataset.revision) {
+    renderCloudRecords();
+    cloudError(new Error('This transaction changed on another device. The list has been refreshed. Review it and try again.'));
+    return;
+  }
   if (button.dataset.action === 'open') return openRecord(record);
   if (button.dataset.action === 'edit') return openRecord(record, { edit: true });
   if (button.dataset.action === 'pay') return markRecordPaid(record);
@@ -867,7 +872,7 @@ function useWorkbook(next, { businessOnly = false, render = true } = {}) {
   $('google-status').textContent = googleUser.email;
   if (render) renderCloudRecords();
   else updateCloudControls();
-  $('generate-pdf').querySelector('span').textContent = exportLabel(); persist();
+  persist();
 }
 function finishSheetConnection(next) {
   useWorkbook(next);
