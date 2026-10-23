@@ -52,9 +52,33 @@ Use **Settings → Business details → More business details** to set a signatu
 
 Signature text is editable in the **Authorised signature** row of the Sheet's **Settings** tab. Uploaded images are encoded in the **Signature image** row and each saved invoice snapshot, so they need no public URL, external image host or extra Google permissions. Manage the image through the app; pasting a picture into a Sheet cell does not import it. The current business profile supplies the signature for both new and saved invoices.
 
-Set **WhatsApp message prefix (optional)** in **Settings → Business details**, then **Save business details**. The text appears above the greeting and invoice details in **Copy message**, **Open WhatsApp** and file sharing. Line breaks are preserved; leave it blank for the standard message. The prefix is stored in your Sheet as **WhatsApp message prefix** and remembered with your business details on this device. It does not appear on the PDF or JPG.
+Set **WhatsApp message template (optional)** in **Settings → Business details**, then **Save business details**. Write the entire message, inserting dynamic fields with the buttons below it or typing their placeholders. For example:
 
-Files are created in the browser. **Share PDF** or **Share JPG** opens the device share menu; select WhatsApp and confirm the recipient yourself. Some receiving apps omit text when sharing a file; **Copy message** and **Open WhatsApp** provide the same invoice message. The review request appears only when your business profile has a review URL. Desktop browsers can download the PDF or JPG images for manual attachment.
+```text
+Hi {customer_name},
+Your invoice {invoice_number} for {total} is ready.
+Thank you, {business_name}.
+```
+
+The template replaces the whole message in **Copy message**, **Open WhatsApp** and file sharing. It uses each invoice's customer, number and total, including past transactions, and the latest business profile. Line breaks are preserved. No greeting, payment instructions or review request are added outside your template. Leave it blank for the standard message.
+
+| Field | Replaced with |
+| --- | --- |
+| `{customer_name}` | Customer name |
+| `{invoice_number}` | Invoice number |
+| `{total}` | Total with currency, e.g. `S$80.00` |
+| `{invoice_date}` | Formatted invoice date |
+| `{payment_status}` | `Paid` or `Unpaid` |
+| `{business_name}` | Current business name |
+| `{service_address}` | Address for that invoice's job |
+| `{items}` | Item descriptions, quantities and prices, one per line |
+| `{payment_instructions}` | Current payment instructions when unpaid; blank when paid |
+| `{review_link}` | Current review link, or blank when unset |
+| `{invoice_summary}` | The complete standard message, including conditional payment instructions and review request |
+
+Fields are replaced as plain text, once; unknown placeholders stay literal. Use double braces to show literal braces, e.g. `{{total}}` prints `{total}`. Templates support up to 3,000 characters and are saved as **WhatsApp message template** in the Sheet's **Settings** tab and with business details on this device. They do not appear on the PDF or JPG. Existing prefixes are upgraded to `your prefix` followed by `{invoice_summary}`, preserving their previous message. Saving Business details replaces the old **WhatsApp message prefix** row with the template row; no manual Sheet migration is needed.
+
+Files are created in the browser. **Share PDF** or **Share JPG** opens the device share menu; select WhatsApp and confirm the recipient yourself. Some receiving apps omit text when sharing a file; **Copy message** and **Open WhatsApp** provide the same invoice message. The standard message's review request appears only when your business profile has a review URL; custom templates include it only through the fields you choose. Desktop browsers can download the PDF or JPG images for manual attachment.
 
 Your working invoice, business defaults, design and saved-item tags are automatically remembered in local storage. Refreshing or reopening the app restores them, including the invoice's record/revision IDs for safe reconnection. Only one current invoice is kept per browser profile; the last tab that saves locally wins. Use **Clear this device’s data** at the bottom of Settings or **Disconnect** to forget it. Clearing device data does not delete saved Google Sheets records.
 

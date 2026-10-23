@@ -1,4 +1,4 @@
-import { SELLER_FIELDS, normalizeSeller, sellerLimits, priceInCents, restoreDraft, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber, invoiceNumberStartError } from './invoice.mjs';
+import { SELLER_FIELDS, normalizeSeller, sellerLimits, priceInCents, restoreDraft, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber, invoiceNumberStartError, messageTemplateFromPrefix } from './invoice.mjs';
 import { DESIGN_SETTINGS, normalizeDesign, validateDesign } from './invoice-design.mjs';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -67,6 +67,9 @@ export function parseWorkbook(metadata, ranges) {
   try { seller = normalizeSeller(JSON.parse(settings.seller)); } catch { seller = normalizeSeller(); }
   for (const [key, label] of Object.entries(businessKeys)) {
     if (Object.hasOwn(settings, label)) seller[key] = String(settings[label] ?? '').slice(0, sellerLimits[key]);
+  }
+  if (!Object.hasOwn(settings, businessKeys.messageTemplate) && Object.hasOwn(settings, 'WhatsApp message prefix')) {
+    seller.messageTemplate = messageTemplateFromPrefix(String(settings['WhatsApp message prefix'] ?? ''));
   }
   seller = normalizeSeller(seller);
   let optionalIndex = Object.keys(TABLES).length;
@@ -274,7 +277,7 @@ export class InvoiceSheets {
     if (numberStart !== undefined && invoiceNumberStartError(numberStart)) errors.push(invoiceNumberStartError(numberStart));
     if (errors.length) throw new SheetsError(errors.join(' '), 'validation');
     const current = await this.load(id);
-    const labels = new Set(['seller', ...Object.values(businessKeys)]);
+    const labels = new Set(['seller', 'WhatsApp message prefix', ...Object.values(businessKeys)]);
     if (numberStart !== undefined) labels.add(NUMBER_START);
     const values = [...current.tables.Settings.filter(values => !labels.has(values[0])), ...businessRows(seller)];
     if (numberStart !== undefined) values.push([NUMBER_START, numberStart]);

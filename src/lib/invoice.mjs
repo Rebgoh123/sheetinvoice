@@ -16,12 +16,18 @@ export const SELLER_FIELDS = {
   terms: { label: 'Invoice footer', id: 'seller-terms', limit: 240 },
   signature: { label: 'Authorised signature', id: 'seller-signature', limit: 60 },
   signatureImage: { label: 'Signature image', id: 'seller-signature-image', limit: MAX_SIGNATURE_LENGTH, isImage: true },
-  messagePrefix: { label: 'WhatsApp message prefix (optional)', sheetKey: 'WhatsApp message prefix', id: 'seller-message-prefix', limit: 1000 },
+  messageTemplate: { label: 'WhatsApp message template (optional)', sheetKey: 'WhatsApp message template', id: 'seller-message-template', limit: 3000 },
   reviewUrl: { label: 'Review link (optional)', sheetKey: 'Review link', id: 'seller-review-url', limit: 1000 },
 };
 export const defaultSeller = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.default ?? '']));
 export const sellerLimits = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.limit]));
+export function messageTemplateFromPrefix(value) {
+  const prefix = typeof value === 'string' ? value.slice(0, 1000).trim() : '';
+  return prefix ? `${prefix.replace(/[{}]/g, brace => brace + brace)}\n\n{invoice_summary}` : '';
+}
 export function normalizeSeller(source) {
+  // Upgrade old profiles without changing their prefix + standard-message behaviour.
+  source = { ...source, messageTemplate: typeof source?.messageTemplate === 'string' ? source.messageTemplate : messageTemplateFromPrefix(source?.messagePrefix) };
   return Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => {
     const value = typeof source?.[key] === 'string' ? source[key] : field.default ?? '';
     if (field.isImage) return [key, normalizeSignatureImage(value)];
@@ -150,18 +156,47 @@ export function validateInvoice(invoice) {
   return errors;
 }
 
-export function invoiceSummary(invoice) {
+function itemSummary(invoice) {
+  return invoice.items.map(item => `${item.description.trim()}${Number(item.quantity) > 1 ? ` x ${item.quantity}` : ''}: ${formatMoney(lineTotal(item))}`);
+}
+
+function standardInvoiceSummary(invoice) {
   return [
-    ...(invoice.seller.messagePrefix?.trim() ? [invoice.seller.messagePrefix.trim(), ''] : []),
     `Hi ${invoice.customer.name.trim()},`, "",
     `Invoice ${invoice.number} | ${displayDate(invoice.date)}`,
-    ...invoice.items.map((item) => `${item.description.trim()}${Number(item.quantity) > 1 ? ` x ${item.quantity}` : ""}: ${formatMoney(lineTotal(item))}`),
+    ...itemSummary(invoice),
     "", `Total: ${formatMoney(invoiceTotal(invoice))}`,
     `Payment status: ${invoice.status === 'paid' ? 'Paid' : 'Unpaid'}`,
     ...(invoice.status !== 'paid' && invoice.seller.payment.trim() ? ["", invoice.seller.payment.trim()] : []),
     "", "Please see the invoice for details.", `Thank you, ${invoice.seller.name.trim()}.`,
     ...(invoice.seller.reviewUrl?.trim() ? ["", "We'd appreciate a review of our service:", invoice.seller.reviewUrl.trim()] : []),
   ].join("\n");
+}
+
+// One field list supplies the editor buttons and the plain-text renderer. No template code is executed.
+export const WHATSAPP_FIELDS = {
+  customer_name: { label: 'Customer name', value: invoice => invoice.customer.name.trim() },
+  invoice_number: { label: 'Invoice number', value: invoice => invoice.number },
+  total: { label: 'Total', value: invoice => formatMoney(invoiceTotal(invoice)) },
+  invoice_date: { label: 'Invoice date', value: invoice => displayDate(invoice.date) },
+  payment_status: { label: 'Payment status', value: invoice => invoice.status === 'paid' ? 'Paid' : 'Unpaid' },
+  business_name: { label: 'Business name', value: invoice => invoice.seller.name.trim() },
+  service_address: { label: 'Service address', value: invoice => invoice.customer.address.trim() },
+  items: { label: 'Items & prices', value: invoice => itemSummary(invoice).join('\n') },
+  payment_instructions: { label: 'Unpaid payment instructions', value: invoice => invoice.status === 'paid' ? '' : invoice.seller.payment.trim() },
+  review_link: { label: 'Review link', value: invoice => invoice.seller.reviewUrl?.trim() || '' },
+  invoice_summary: { label: 'Full invoice summary', value: standardInvoiceSummary },
+};
+
+export function invoiceSummary(invoice) {
+  const template = invoice.seller.messageTemplate?.trim();
+  if (!template) return standardInvoiceSummary(invoice);
+  // Replace once, so braces in customer names or other values stay literal.
+  return template.replace(/\{\{|\}\}|\{([a-z_]+)\}/g, (match, key) => {
+    if (match === '{{') return '{';
+    if (match === '}}') return '}';
+    return Object.hasOwn(WHATSAPP_FIELDS, key) ? WHATSAPP_FIELDS[key].value(invoice) : match;
+  });
 }
 
 export function whatsappUrl(invoice) {

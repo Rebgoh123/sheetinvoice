@@ -196,6 +196,10 @@ body { margin:0; }
 .invoice-app #connect-google { margin-top:14px; }
 .invoice-app #business-form .iv-meta-grid { max-width:none; }
 .invoice-app #save-business-defaults { margin-top:18px; }
+.invoice-app .iv-message-fields { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:12px; font-size:12px; }
+.invoice-app .iv-message-fields>span { flex-basis:100%; color:var(--iv-muted); }
+.invoice-app .iv-message-fields .iv-button { white-space:normal; text-align:left; }
+.invoice-app #message-field-status:empty { display:none; }
 .invoice-app .iv-export-navigation { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
 .invoice-app .iv-signature-preview { display:block; max-width:240px; width:100%; height:80px; object-fit:contain; object-position:left center; margin-top:12px; border:1px solid var(--iv-line); background:white; }
 .invoice-app #result-heading { margin-bottom:20px; overflow-wrap:anywhere; }

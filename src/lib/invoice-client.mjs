@@ -45,6 +45,7 @@ const fields = {
 };
 function fillBusinessForm() {
   signatureUpload++; signatureBusy = false;
+  $('message-field-status').textContent = '';
   for (const [key, field] of Object.entries(SELLER_FIELDS)) $(field.id).value = business[key];
   $('signature-upload').value = ''; $('signature-status').textContent = ''; $('signature-error').hidden = true;
   renderSignature();
@@ -80,6 +81,7 @@ function applyNumbering(next) {
 function resetBusinessProfile() { business = normalizeSeller(); numberStart = ''; profileDirty = false; fillBusinessForm(); }
 function businessChanged(event) {
   if (event.target.id === 'signature-upload') return;
+  $('message-field-status').textContent = '';
   readBusinessForm(); profileDirty = true;
   if (event.target.id !== 'invoice-number-start') {
     const viewingInvoice = activeView === 'settings' && previousView === 'pdf' && generated;
@@ -638,6 +640,7 @@ function updateCloudControls() {
   for (const id of ['create-sheet', 'refresh-sheet', 'save-business-defaults', 'setup-saved-items', 'setup-design', 'apply-design']) $(id).disabled = googleBusy || generating;
   $('save-business-defaults').disabled ||= signatureBusy;
   for (const id of ['upload-signature', 'remove-signature']) $(id).disabled = signatureBusy || generating || googleBusy;
+  for (const button of document.querySelectorAll('[data-message-field]')) button.disabled = generating || googleBusy;
   $('settings-done').disabled = signatureBusy || generating;
   $('save-business-defaults').textContent = workbook?.seller.name.trim() ? 'Save business details' : 'Save & start invoicing';
   $('apply-design').hidden = !workbook || JSON.stringify(normalizeDesign(invoice.design)) === JSON.stringify(workbook.design);
@@ -1029,6 +1032,16 @@ $('business-form').addEventListener('submit', event => { event.preventDefault();
   const epoch = connectionEpoch, next = await sheets.saveSeller(workbook.id, business, numberStart);
   if (epoch === connectionEpoch) { workbook = next; profileDirty = false; applyNumbering(next); persist(); $('business-save-status').textContent = 'Business details saved to this Google Sheet.'; if (firstDetails) showView('invoice'); }
 }); });
+document.querySelectorAll('[data-message-field]').forEach(button => button.addEventListener('click', () => {
+  const input = $('seller-message-template'), field = `{${button.dataset.messageField}}`;
+  if (input.value.length - (input.selectionEnd - input.selectionStart) + field.length > input.maxLength) {
+    $('message-field-status').textContent = `Keep the message template within ${input.maxLength} characters.`;
+    return;
+  }
+  $('message-field-status').textContent = '';
+  input.setRangeText(field, input.selectionStart, input.selectionEnd, 'end'); input.focus();
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}));
 window.addEventListener('beforeunload', event => { if ((dirty || profileDirty) && !deviceSaved) { event.preventDefault(); event.returnValue = ''; } });
 window.addEventListener('focus', async () => {
   if (!sheets || !workbook || checkingAccess || googleBusy || generating || signatureBusy) return;
