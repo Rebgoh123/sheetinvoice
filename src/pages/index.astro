@@ -40,8 +40,7 @@ const googleConfig = {
         <div id="invoice-app" hidden>
           <section id="invoice-panel" class="iv-panel" role="tabpanel" aria-labelledby="invoice-tab">
             <div class="iv-title-row"><div class="iv-title"><h1 id="invoice-heading">New invoice</h1><span id="draft-status" class="draft-status" role="status" hidden></span></div><button id="new-invoice" class="iv-text-button" type="button">Reset<Icon name="reset" /></button></div>
-            <div id="business-hint" class="connect-hint"><span>Add your business details before making an invoice.</span><button class="iv-text-button" type="button" data-open-settings>Set up</button></div>
-            <div id="connect-hint" class="connect-hint"><span id="connect-hint-text">Connect Google to save invoices.</span><button class="iv-text-button" type="button" data-open-settings>Connect</button></div>
+            <div id="connect-hint" class="connect-hint"><span id="connect-hint-text">Keep your invoices in your own Sheet.</span><button class="iv-button iv-primary" type="button" data-connect-sheet disabled>Connect Google Sheet</button></div>
             <div id="error-box" class="notice" role="alert" tabindex="-1" hidden></div>
             <form id="invoice-form">
               <div class="iv-customer-grid">
@@ -53,7 +52,7 @@ const googleConfig = {
                 <div><label for="customer-phone">WhatsApp number</label><input id="customer-phone" name="customerPhone" type="tel" autocomplete="section-customer tel" placeholder="e.g. 9123 4567" maxlength="40" /></div>
               </div>
               <div class="iv-field"><label for="customer-address">Service address</label><textarea id="customer-address" name="customerAddress" rows="1" autocomplete="street-address" placeholder="Address for this job" maxlength="400"></textarea></div>
-              <div class="iv-meta-grid"><div><label for="invoice-number">Invoice number</label><input id="invoice-number" name="invoiceNumber" maxlength="70" required /></div><div><label for="invoice-date">Date</label><input id="invoice-date" name="invoiceDate" type="date" required /></div></div>
+              <details id="invoice-details" class="iv-notes iv-invoice-details"><summary>Invoice details<span id="invoice-details-summary"></span></summary><div class="iv-meta-grid"><div><label for="invoice-number">Invoice number</label><input id="invoice-number" name="invoiceNumber" maxlength="70" required /></div><div><label for="invoice-date">Date</label><input id="invoice-date" name="invoiceDate" type="date" required /></div></div></details>
               <section class="iv-items" aria-labelledby="items-heading">
                 <section id="quick-items" class="iv-quick-items" aria-labelledby="quick-items-heading" hidden><h2 id="quick-items-heading">Saved items</h2><div id="saved-item-tags" class="iv-item-tags" role="group" aria-label="Tap to add saved items"></div><p id="quick-add-status" class="sr-only" role="status"></p></section>
                 <div class="iv-section-heading"><h2 id="items-heading">Items</h2><span>SGD</span></div>
@@ -72,7 +71,7 @@ const googleConfig = {
           </section>
           <section id="history-panel" class="iv-panel" role="tabpanel" aria-labelledby="history-tab" hidden>
             <div class="iv-title-row"><h1>Past transactions</h1><button id="history-new-invoice" class="iv-button iv-primary" type="button"><Icon name="plus" />New invoice</button></div>
-            <div id="history-connect" class="connect-hint"><span>Connect your Sheet to view transactions.</span><button class="iv-text-button" type="button" data-open-settings>Connect</button></div>
+            <div id="history-connect" class="connect-hint"><span>Connect your Sheet to view transactions.</span><button class="iv-button iv-primary" type="button" data-connect-sheet disabled>Connect Google Sheet</button></div>
             <div class="iv-history-filters">
               <div><label for="history-customer">Customer</label><select id="history-customer" disabled><option value="">All customers</option></select></div>
               <div><span id="history-status-label" class="field-label">Payment status</span><div class="iv-status-filters" role="group" aria-labelledby="history-status-label"><button type="button" data-status="all" aria-pressed="true">All</button><button type="button" data-status="unpaid" aria-pressed="false">Unpaid</button><button type="button" data-status="paid" aria-pressed="false">Paid</button></div></div>
@@ -87,48 +86,50 @@ const googleConfig = {
           <section id="settings-panel" class="iv-panel" aria-labelledby="settings-heading" hidden>
             <div class="iv-title-row"><h1 id="settings-heading">Settings</h1><button id="settings-done" class="iv-text-button" type="button">Done<Icon name="check" /></button></div>
             <section class="iv-setting-section" aria-labelledby="google-heading">
-              <div class="iv-section-heading"><h2 id="google-heading">Google Sheet</h2><button id="disconnect-google" class="iv-text-button" type="button" hidden>Disconnect</button></div>
-              <p id="google-status" class="field-help" role="status">Connect Google to save records in a private Sheet.</p>
-              <button id="connect-google" class="iv-button" type="button" disabled>Loading Google…</button>
-              <p class="field-help">Your Sheet syncs directly with Google. Drafts and defaults are also remembered on this device. SheetInvoice keeps no server copy. <a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></p>
+              <h2 id="google-heading">Google Sheet</h2>
+              <p id="google-status" class="field-help" role="status">Connect your Google Sheet to keep customers, invoices and business details together.</p>
+              <button id="connect-google" class="iv-button iv-primary" type="button" disabled>Connect Google Sheet</button>
+              <p class="field-help">Records stay in your Sheet. Drafts are remembered on this device. <a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></p>
               <div id="sheet-setup" hidden>
                 <form id="create-sheet-form" class="sheet-create"><div><label for="sheet-name">New Sheet name</label><input id="sheet-name" value="My invoices" required maxlength="100" /></div><button id="create-sheet" class="iv-button iv-primary" type="submit">Create private Sheet</button></form>
-                <div class="sheet-existing"><div><label for="existing-sheet">Existing invoice workbook</label><select id="existing-sheet"><option value="">Choose a workbook</option></select></div><button id="use-existing-sheet" class="iv-button" type="button" disabled>Use Sheet</button></div>
-                <button id="choose-sheet" class="iv-text-button" type="button" disabled>Choose from Google Drive</button>
-                <p class="field-help">Keep General access set to Restricted. Share with another person as an Editor to let them use this workbook.</p>
+                <details id="existing-sheet-options" class="iv-notes"><summary>Use an existing Sheet</summary><div class="sheet-existing"><div><label for="existing-sheet">Invoice Sheet</label><select id="existing-sheet"><option value="">Choose a workbook</option></select></div><button id="use-existing-sheet" class="iv-button" type="button" disabled>Use Sheet</button></div><button id="choose-sheet" class="iv-text-button" type="button" disabled>Choose from Google Drive</button><p class="field-help">Choose a Sheet created with SheetInvoice. It must have General access set to Restricted.</p></details>
               </div>
-              <div id="sheet-connected" hidden><div class="iv-sheet-name"><Icon name="sheet" /><div><strong id="connected-sheet-name"></strong><a id="open-sheet" target="_blank" rel="noopener noreferrer">Open Google Sheet<Icon name="external" /></a></div><span class="iv-small-badge iv-badge-paid">Private</span></div><div class="sheet-actions"><button id="refresh-sheet" class="iv-text-button" type="button">Refresh records</button><button id="change-sheet" class="iv-text-button" type="button">Change Sheet</button></div></div>
+              <div id="sheet-connected" hidden><div class="iv-sheet-name"><Icon name="sheet" /><div><strong id="connected-sheet-name"></strong><a id="open-sheet" target="_blank" rel="noopener noreferrer">Open Google Sheet<Icon name="external" /></a></div><span class="iv-small-badge iv-badge-paid">Private</span></div><button id="refresh-sheet" class="iv-text-button" type="button">Refresh records</button></div>
+              <details id="connection-options" class="iv-notes" hidden><summary>Connection options</summary><div class="sheet-actions"><button id="change-sheet" class="iv-text-button" type="button" hidden>Change Sheet</button><button id="disconnect-google" class="iv-text-button" type="button" hidden>Disconnect</button></div></details>
             </section>
-            <section id="business-defaults" class="iv-setting-section" aria-labelledby="business-heading">
-              <h2 id="business-heading">Business details</h2>
-              <p class="field-help">Save here to keep editable defaults in your Sheet’s Settings tab. After editing the Sheet, select Refresh records. Used for new invoices.</p>
+            <details id="business-defaults" class="iv-setting-section iv-settings-details" aria-labelledby="business-heading">
+              <summary><h2 id="business-heading">Business details</h2></summary>
+              <p class="field-help">Your details for new invoices. Saved in your Sheet.</p>
               <form id="business-form">
                 <div class="iv-field"><label for="seller-name">Business name</label><input id="seller-name" name="sellerName" maxlength="120" required /></div>
                 <div class="iv-field"><label for="seller-address">Business address</label><textarea id="seller-address" name="sellerAddress" rows="2" maxlength="240"></textarea></div>
-                <div class="iv-meta-grid"><div><label for="seller-contact">Contact name</label><input id="seller-contact" name="sellerContact" maxlength="50" /></div><div><label for="seller-phone">Business phone</label><input id="seller-phone" name="sellerPhone" type="tel" maxlength="60" /></div></div>
-                <div class="iv-meta-grid"><div><label for="seller-email">Business email</label><input id="seller-email" name="sellerEmail" type="email" maxlength="120" /></div><div><label for="seller-registration">UEN / registration</label><input id="seller-registration" name="sellerRegistration" maxlength="80" /></div></div>
+                <div class="iv-field"><label for="seller-phone">Business phone</label><input id="seller-phone" name="sellerPhone" type="tel" maxlength="60" /></div>
                 <div class="iv-field"><label for="seller-payment">Payment instructions</label><textarea id="seller-payment" name="sellerPayment" rows="2" maxlength="800" placeholder="PayNow number and account name"></textarea></div>
+                <details class="iv-notes"><summary>More business details</summary>
+                <div class="iv-meta-grid"><div><label for="seller-contact">Contact name</label><input id="seller-contact" name="sellerContact" maxlength="50" /></div><div><label for="seller-email">Business email</label><input id="seller-email" name="sellerEmail" type="email" maxlength="120" /></div></div>
+                <div class="iv-field"><label for="seller-registration">UEN / registration</label><input id="seller-registration" name="sellerRegistration" maxlength="80" /></div>
                 <div class="iv-field"><label for="seller-terms">Invoice footer</label><textarea id="seller-terms" name="sellerTerms" rows="2" maxlength="240"></textarea></div>
                 <div class="iv-field"><label for="seller-review-url">Review link (optional)</label><input id="seller-review-url" name="sellerReviewUrl" type="url" maxlength="1000" placeholder="https://…" /><p class="field-help">Included in the WhatsApp message when filled in.</p></div>
+                </details>
                 <button id="save-business-defaults" class="iv-button" type="submit" hidden>Save business details</button><p id="business-save-status" class="field-help" role="status"></p>
               </form>
-            </section>
-            <section id="saved-items-settings" class="iv-setting-section" aria-labelledby="saved-items-heading" hidden>
-              <h2 id="saved-items-heading">Saved items</h2>
+            </details>
+            <details id="saved-items-settings" class="iv-setting-section iv-settings-details" aria-labelledby="saved-items-heading" hidden>
+              <summary><h2 id="saved-items-heading">Saved items</h2></summary>
               <p class="field-help">Add your usual items or services in the Sheet’s Saved items tab: description, quantity and unit price in SGD. Leave the price blank to enter it per invoice.</p>
               <p id="saved-items-status" class="field-help" role="status"></p>
               <p id="saved-items-warning" class="notice" role="status" hidden></p>
-              <div class="sheet-actions"><button id="setup-saved-items" class="iv-button" type="button">Set up saved items</button><a id="edit-saved-items" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
+              <div class="sheet-actions"><button id="setup-saved-items" class="iv-button" type="button">Add saved items tab</button><a id="edit-saved-items" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
               <p class="field-help">After editing the Sheet, select Refresh records above. Tap a saved-item tag below the customer details to add it. Tap again to increase the quantity.</p>
-            </section>
-            <section id="design-settings" class="iv-setting-section" aria-labelledby="design-heading" hidden>
-              <h2 id="design-heading">Invoice design</h2>
+            </details>
+            <details id="design-settings" class="iv-setting-section iv-settings-details" aria-labelledby="design-heading" hidden>
+              <summary><h2 id="design-heading">Invoice design</h2></summary>
               <p class="field-help">Choose colours and left, centre or right text alignment in your Sheet’s Invoice design tab. Each setting includes its available options.</p>
-              <div class="sheet-actions"><button id="setup-design" class="iv-button" type="button">Set up invoice design</button><a id="edit-design" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
+              <div class="sheet-actions"><button id="setup-design" class="iv-button" type="button">Add invoice design tab</button><a id="edit-design" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
               <p class="field-help">After editing, select Refresh records. New invoices use this design. Saved invoices keep their original design.</p>
               <p id="design-warning" class="notice" role="status" hidden></p>
               <button id="apply-design" class="iv-text-button" type="button" hidden>Apply design to current invoice</button><p id="design-status" class="field-help" role="status"></p>
-            </section>
+            </details>
             <details class="iv-notes"><summary>This device</summary><p class="field-help">Your current invoice, business details, design and saved items are remembered in this browser. Clear remembered data when using a shared device. Google sign-in and transaction history are not stored here.</p><p id="device-storage-status" class="field-help" role="status"></p><div class="device-actions"><button id="clear-device" class="iv-text-button" type="button">Clear this device’s data</button></div></details>
           </section>
           <section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>

@@ -107,7 +107,7 @@ function persist() {
   $('draft-status').textContent = dirty ? (deviceSaved ? 'Saved on device' : 'Unsaved changes') : '';
   $('draft-status').hidden = !dirty;
   $('invoice-heading').textContent = baseRevision ? 'Edit invoice' : 'New invoice';
-  $('business-hint').hidden = !!invoice.seller.name.trim();
+  $('invoice-details-summary').textContent = [invoice.number, invoice.date].filter(Boolean).join(' · ');
 }
 function errors(messages = []) {
   const box = $("error-box"); box.replaceChildren(); box.hidden = !messages.length;
@@ -201,6 +201,7 @@ function renderSavedItems() {
   $('saved-items-status').textContent = workbook ? `${items.length} saved item${items.length === 1 ? '' : 's'} available.` : '';
   $('saved-items-warning').textContent = workbook?.savedItemsWarning || '';
   $('saved-items-warning').hidden = !workbook?.savedItemsWarning;
+  if (workbook?.savedItemsWarning) $('saved-items-settings').open = true;
   updateSavedItemControl();
 }
 function renderDesign() {
@@ -212,6 +213,7 @@ function renderDesign() {
   if (Number.isInteger(tab)) $('edit-design').href = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(workbook.id)}/edit#gid=${tab}`;
   $('design-warning').textContent = workbook?.designWarning || '';
   $('design-warning').hidden = !workbook?.designWarning;
+  if (workbook?.designWarning) $('design-settings').open = true;
   $('design-status').textContent = '';
 }
 
@@ -247,6 +249,11 @@ async function completeInvoice({ pdf = true } = {}) {
   $('google-error').hidden = true;
   if (!pdf && !workbook) return;
   readForm(); errors();
+  if (!invoice.seller.name.trim()) {
+    showView('settings'); $('business-defaults').open = true;
+    $('business-save-status').textContent = 'Enter your business name for this invoice.';
+    $('seller-name').focus(); return;
+  }
   const validation = validateInvoice(invoice);
   if (validation.length) { errors(validation); return; }
   generating = true;
@@ -317,7 +324,10 @@ document.querySelectorAll('[role=tab]').forEach((tab, index, tabs) => tab.addEve
 }));
 $('settings-button').addEventListener('click', () => showView(activeView === 'settings' ? previousView : 'settings'));
 $('settings-done').addEventListener('click', () => showView(previousView));
-document.querySelectorAll('[data-open-settings]').forEach(button => button.addEventListener('click', () => showView('settings')));
+document.addEventListener('invalid', event => {
+  let details = event.target.closest('details');
+  while (details) { details.open = true; details = details.parentElement.closest('details'); }
+}, true);
 $('new-customer').addEventListener('click', () => {
   if (customerMode === 'saved') {
     customerMode = 'new'; customerId = null; $('saved-customer').value = '';
@@ -406,7 +416,16 @@ function updateCloudControls() {
   $('connect-google').disabled = (!tokenClient && !googleLoadFailed) || googleBusy || generating;
   $('connect-google').hidden = !!sheets;
   $('disconnect-google').hidden = !sheets && !googleUser;
+  $('connection-options').hidden = !sheets && !googleUser;
+  $('change-sheet').hidden = !workbook;
+  const connectLabel = googleBusy ? 'Connecting…' : requiresSheetSave ? 'Reconnect Google Sheet' : 'Connect Google Sheet';
+  $('connect-google').textContent = connectLabel;
+  for (const button of document.querySelectorAll('[data-connect-sheet]')) {
+    button.disabled = $('connect-google').disabled;
+    button.textContent = connectLabel;
+  }
   for (const id of ['create-sheet', 'refresh-sheet', 'change-sheet', 'save-business-defaults', 'setup-saved-items', 'setup-design', 'apply-design', 'disconnect-google']) $(id).disabled = googleBusy || generating;
+  $('save-business-defaults').textContent = workbook?.seller.name.trim() ? 'Save business details' : 'Save & start invoicing';
   $('apply-design').hidden = !workbook || JSON.stringify(normalizeDesign(invoice.design)) === JSON.stringify(workbook.design);
   updateSavedItemControl();
   $('choose-sheet').disabled = !pickerReady || !sheets || googleBusy || generating;
@@ -420,11 +439,11 @@ function updateCloudControls() {
   $('history-previous').disabled = googleBusy || generating || historyPage === 0;
   $('history-next').disabled = googleBusy || generating || historyPage >= Math.ceil(filteredHistory().length / 10) - 1;
   for (const id of ['new-invoice', 'history-new-invoice', 'new-customer', 'clear-device', 'saved-customer']) $(id).disabled = (googleBusy && !!sheets) || generating;
-  $('connection-label').textContent = workbook ? 'Sheet connected' : googleBusy ? 'Connecting…' : sheets ? 'Choose a Sheet' : requiresSheetSave ? 'Reconnect Google' : 'Not connected';
+  $('connection-label').textContent = workbook ? 'Sheet connected' : googleBusy ? 'Connecting…' : sheets ? 'Choose a Sheet' : requiresSheetSave ? 'Reconnect Sheet' : 'Not connected';
   $('connection-status').dataset.connected = String(!!workbook);
   $('connect-hint').hidden = !!workbook;
   $('history-connect').hidden = !!workbook;
-  $('connect-hint-text').textContent = requiresSheetSave ? 'Reconnect Google to save this draft.' : 'Connect Google to save invoices.';
+  $('connect-hint-text').textContent = requiresSheetSave ? 'Reconnect your Sheet to save this draft.' : 'Keep your invoices in your own Sheet.';
 }
 function cloudError(error) {
   $('google-error').textContent = error.message || 'Google could not finish this action. Your draft is still here.';
@@ -539,6 +558,7 @@ function useWorkbook(next) {
   recordWorkbookId = next.id;
   workbook = next; cachedItems = next.savedItems; cachedDesign = normalizeDesign(next.design); requiresSheetSave = true;
   if (!profileDirty || changedWorkbook) { business = normalizeSeller(next.seller); profileDirty = false; fillBusinessForm(); }
+  if (!business.name.trim()) $('business-defaults').open = true;
   if ((!dirty && !baseRevision) || changedWorkbook) { invoice.seller = { ...business }; fillForm(); }
   if ((!baseRevision || changedWorkbook) && JSON.stringify(invoice.design) !== JSON.stringify(next.design)) {
     invoice.design = normalizeDesign(next.design); revision++; recordRevision = crypto.randomUUID(); discardPdf();
@@ -550,12 +570,18 @@ function useWorkbook(next) {
   try { localStorage.setItem(`sheetinvoice-sheet-${googleUser.id}`, next.id); } catch { /* Remembering a Sheet ID is optional. */ }
   renderCloudRecords(); $('generate-pdf').querySelector('span').textContent = pdfLabel(); persist();
 }
+function finishSheetConnection(next) {
+  useWorkbook(next);
+  if (business.name.trim()) showView(previousView === 'history' ? 'history' : 'invoice');
+  else { showView('settings'); $('business-defaults').open = true; $('seller-name').focus(); }
+}
 async function showSheetSetup() {
   const active = sheets, epoch = connectionEpoch;
   const files = await active.list();
   if (epoch !== connectionEpoch) return;
   $('existing-sheet').replaceChildren(new Option('Choose a workbook', ''));
   for (const file of files) $('existing-sheet').add(new Option(file.name, file.id));
+  $('existing-sheet-options').open = files.length > 0;
   $('sheet-setup').hidden = false;
   $('google-status').textContent = `${googleUser.email} · Choose or create your invoice Sheet.`;
 }
@@ -582,17 +608,21 @@ async function connected(token) {
     expiryTimer = setTimeout(() => cloudError(Object.assign(new Error('Your Google connection expired. Reconnect to continue. Your unsaved draft remains in this tab.'), { code: 'expired' })), Math.max(0, token.expiresAt - Date.now()));
     await showSheetSetup();
     const previous = recordWorkbookId || stored(`sheetinvoice-sheet-${googleUser.id}`);
-    if (previous && epoch === connectionEpoch) { const next = await active.load(previous); if (epoch === connectionEpoch) useWorkbook(next); }
+    if (previous && epoch === connectionEpoch) { const next = await active.load(previous); if (epoch === connectionEpoch) finishSheetConnection(next); }
   } catch (error) { if (epoch === connectionEpoch) cloudError(error); }
   finally { googleBusy = false; updateCloudControls(); persist(); }
 }
-$('connect-google').addEventListener('click', () => {
+function connectSheet() {
+  showView('settings', false);
+  if (sheets) { $('sheet-setup').scrollIntoView({ block: 'nearest' }); return; }
   if (googleBusy) return;
   if (!tokenClient) { if (googleLoadFailed) initializeGoogle(); return; }
   googleBusy = true; $('google-error').hidden = true; updateCloudControls();
   loginEpoch = connectionEpoch;
   tokenClient.requestAccessToken({ prompt: 'select_account', ...(googleUser ? { hint: googleUser.email } : {}) });
-});
+}
+$('connect-google').addEventListener('click', connectSheet);
+document.querySelectorAll('[data-connect-sheet]').forEach(button => button.addEventListener('click', connectSheet));
 $('disconnect-google').addEventListener('click', () => {
   if ((dirty || profileDirty) && !window.confirm('Disconnect and clear remembered data on this device? Save your draft to Sheets first if you need to keep it.')) return;
   disconnectAndClear();
@@ -601,11 +631,11 @@ $('create-sheet-form').addEventListener('submit', event => { event.preventDefaul
   readForm(); readBusinessForm(); const active = sheets, epoch = connectionEpoch;
   $('google-status').textContent = 'Creating your private invoice Sheet…';
   const next = await active.create($('sheet-name').value, business);
-  if (epoch === connectionEpoch) { useWorkbook(next); $('business-save-status').textContent = 'Review and save your business details below.'; }
+  if (epoch === connectionEpoch) { finishSheetConnection(next); $('business-save-status').textContent = business.name.trim() ? '' : 'Add your business name, then start invoicing.'; }
 }); });
 $('existing-sheet').addEventListener('change', updateCloudControls);
-$('use-existing-sheet').addEventListener('click', () => cloudAction(async () => { const epoch = connectionEpoch, next = await sheets.load($('existing-sheet').value); if (epoch === connectionEpoch) useWorkbook(next); }));
-$('choose-sheet').addEventListener('click', () => cloudAction(async () => { const epoch = connectionEpoch, id = await chooseSheet(googleConfig, sheets.token); if (!id || epoch !== connectionEpoch) return; const next = await sheets.load(id); if (epoch === connectionEpoch) useWorkbook(next); }));
+$('use-existing-sheet').addEventListener('click', () => cloudAction(async () => { const epoch = connectionEpoch, next = await sheets.load($('existing-sheet').value); if (epoch === connectionEpoch) finishSheetConnection(next); }));
+$('choose-sheet').addEventListener('click', () => cloudAction(async () => { const epoch = connectionEpoch, id = await chooseSheet(googleConfig, sheets.token); if (!id || epoch !== connectionEpoch) return; const next = await sheets.load(id); if (epoch === connectionEpoch) finishSheetConnection(next); }));
 $('refresh-sheet').addEventListener('click', () => cloudAction(async () => { const epoch = connectionEpoch, next = await sheets.load(workbook.id); if (epoch === connectionEpoch) useWorkbook(next); }));
 $('setup-saved-items').addEventListener('click', () => cloudAction(async () => {
   if (!workbook) return;
@@ -644,8 +674,9 @@ $('business-form').addEventListener('submit', event => { event.preventDefault();
   readBusinessForm(); const errors = validateSeller(business);
   if (errors.length) throw new Error(errors.join(' '));
   if (!workbook || !sheets) { persist(); $('business-save-status').textContent = 'Remembered on this device. Connect a Sheet to sync your defaults.'; return; }
+  const firstDetails = !workbook.seller.name.trim();
   const epoch = connectionEpoch, next = await sheets.saveSeller(workbook.id, business);
-  if (epoch === connectionEpoch) { workbook = next; profileDirty = false; persist(); $('business-save-status').textContent = 'Business details saved to this Google Sheet.'; }
+  if (epoch === connectionEpoch) { workbook = next; profileDirty = false; persist(); $('business-save-status').textContent = 'Business details saved to this Google Sheet.'; if (firstDetails) showView('invoice'); }
 }); });
 window.addEventListener('beforeunload', event => { if ((dirty || profileDirty) && !deviceSaved) { event.preventDefault(); event.returnValue = ''; } });
 window.addEventListener('focus', () => {
@@ -659,10 +690,8 @@ async function initializeGoogle() {
   googleBusy = true; googleLoadFailed = false; $('connect-google').textContent = 'Loading Google…'; updateCloudControls();
   try {
     tokenClient = await prepareGoogle(googleConfig, connected, error => { googleBusy = false; cloudError(error); });
-    $('connect-google').textContent = 'Connect Google';
   } catch (error) {
     googleLoadFailed = error.code !== 'configuration';
-    $('connect-google').textContent = googleLoadFailed ? 'Retry Google connection' : 'Google setup needed';
     $('google-status').textContent = error.message;
   } finally { googleBusy = false; updateCloudControls(); }
 }

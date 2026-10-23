@@ -6,17 +6,19 @@ There is no separate website account or password. The app is public; Google auth
 
 ## Use it
 
-1. Open **Settings → Connect Google**.
+1. Tap **Connect Google Sheet** on the invoice page and sign in to Google.
 2. **Create private Sheet**, or choose an invoice workbook created by this tool through Google Drive.
-3. Fill in **Business details** and save them to the Sheet: business name, address, contact, phone, email, registration, payment instructions, invoice footer and optional review URL. Keep any unused fields blank.
-4. Return to **Invoice**, enter a customer and items, then **Save** or **Save & PDF**. New invoices are unpaid; tick **Mark as paid** when paid.
+3. A new Sheet opens **Business details**. Enter your business name, add any other details you need, then **Save & start invoicing**. Optional fields are under **More business details**. An existing Sheet with business details returns straight to the invoice.
+4. Enter a customer and items, then **Save** or **Save & PDF**. Invoice number and date are filled automatically; expand **Invoice details** to edit them. New invoices are unpaid; tick **Mark as paid** when paid.
 5. Use **Past transactions** to filter by customer and payment status, open an invoice or mark it paid.
 
-To reuse items, open **Settings → Saved items → Edit in Google Sheet**. In the Sheet's **Saved items** tab, enter `Description`, `Quantity` and `Unit price (SGD)` under the existing column headings. Quantity defaults to 1 when blank; leave the price blank if it varies per invoice. Return to the app and choose **Refresh records**. Tap the saved-item tags at the top of the invoice to add them; tapping the same description and price again increases its quantity. Tags show the quantity already added and keep focus for repeated taps. You can edit the line for that job. Up to 100 saved items are loaded per Sheet. Older workbooks get the tab through **Set up saved items**.
+To reuse items, open **Settings → Saved items → Edit in Google Sheet**. In the Sheet's **Saved items** tab, enter `Description`, `Quantity` and `Unit price (SGD)` under the existing column headings. Quantity defaults to 1 when blank; leave the price blank if it varies per invoice. Return to the app and choose **Refresh records**. Tap the saved-item tags below the customer details to add them; tapping the same description and price again increases its quantity. Tags show the quantity already added and keep focus for repeated taps. You can edit the line for that job. Up to 100 saved items are loaded per Sheet. Older workbooks get the tab through **Add saved items tab**.
 
 Business defaults can also be edited directly in the Sheet's **Settings** tab: change the value beside Business name, Business address, Contact name, Business phone, Business email, UEN / registration, Payment instructions, Invoice footer or Review link. Keep the labels and `schema` row intact, then **Refresh records** in the app. For older workbooks, save Business details once in the app to replace the old JSON profile with these readable rows. Customers already have their own editable **Customers** tab. Refresh loads Sheet changes; existing invoice snapshots are preserved.
 
-To customise the PDF, open **Settings → Invoice design**. Older workbooks first need **Set up invoice design**. Use **Edit in Google Sheet** and change the **Value** column in the **Invoice design** tab:
+Business details, saved items, design and connection options are collapsed until needed. Any section containing an invalid form field opens automatically when you try to save.
+
+To customise the PDF, open **Settings → Invoice design**. Older workbooks first need **Add invoice design tab**. Use **Edit in Google Sheet** and change the **Value** column in the **Invoice design** tab:
 
 | Setting | Example / options |
 | --- | --- |

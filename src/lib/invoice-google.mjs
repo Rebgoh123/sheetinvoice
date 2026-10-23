@@ -32,7 +32,7 @@ export async function prepareGoogle(config, onToken, onError) {
       const duration = Number(response.expires_in);
       onToken({ token: response.access_token, expiresAt: Date.now() + (Number.isFinite(duration) ? Math.max(0, duration - 30) : 0) * 1000 });
     },
-    error_callback: () => onError(new SheetsError('Google sign-in was closed or blocked. Tap Connect Google to try again, and allow the sign-in popup.', 'popup')),
+    error_callback: () => onError(new SheetsError('Google sign-in was closed or blocked. Tap Connect Google Sheet to try again, and allow the sign-in popup.', 'popup')),
   });
 }
 
