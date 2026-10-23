@@ -40,7 +40,7 @@ const googleConfig = {
         <p id="google-error" class="notice" role="alert" tabindex="-1" hidden></p>
         <div id="invoice-app" hidden>
           <section id="invoice-panel" class="iv-panel" role="tabpanel" aria-labelledby="invoice-tab">
-            <div class="iv-title-row"><div class="iv-title"><h1 id="invoice-heading">New invoice</h1><span id="draft-status" class="draft-status" role="status" hidden></span></div><button id="new-invoice" class="iv-text-button" type="button">Reset<Icon name="reset" /></button><button id="close-edit" class="iv-text-button" type="button" aria-label="Close edit and go back" hidden>Close<Icon name="close" /></button></div>
+            <div class="iv-title-row"><div class="iv-title"><h1 id="invoice-heading">New invoice</h1><span id="draft-status" class="draft-status" role="status" hidden></span></div><button id="new-invoice" class="iv-text-button" type="button">Reset<Icon name="reset" /></button><button id="close-edit" class="iv-text-button" type="button" aria-label="Close edit without saving and go back" title="Close edit without saving" hidden>Close<Icon name="close" /></button></div>
             <div id="reset-feedback" class="iv-inline-feedback" hidden><span role="status">New invoice started.</span><button id="undo-reset" class="iv-text-button" type="button">Undo reset</button></div>
             <div id="connect-hint" class="connect-hint"><span id="connect-hint-text">Keep your invoices in your own Sheet.</span><button class="iv-button iv-primary" type="button" data-connect-sheet disabled>Connect Google Sheet</button></div>
             <div id="error-box" class="notice" role="alert" tabindex="-1" hidden></div>
@@ -142,18 +142,20 @@ const googleConfig = {
               <p id="design-warning" class="notice" role="status" hidden></p>
               <button id="apply-design" class="iv-text-button" type="button" hidden>Apply design to current invoice</button><p id="design-status" class="field-help" role="status"></p>
             </details>
-            <div class="iv-settings-clear"><div class="iv-settings-actions"><button id="change-sheet" class="iv-text-button" type="button" disabled>Change Sheet</button><button id="disconnect-google" class="iv-text-button" type="button" disabled>Disconnect</button><button id="clear-device" class="iv-text-button" type="button">Clear this device’s data</button></div><p id="device-storage-status" class="field-help" role="status"></p></div>
+            <div class="iv-settings-clear"><div class="iv-settings-actions"><button id="change-sheet" class="iv-text-button" type="button" disabled>Change Sheet</button><button id="disconnect-google" class="iv-text-button iv-danger-text" type="button" disabled>Disconnect</button><button id="clear-device" class="iv-text-button iv-danger-text" type="button">Clear this device’s data</button></div><p id="device-storage-status" class="field-help" role="status"></p></div>
           </section>
           <section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>
             <div class="iv-export-navigation"><button id="result-back" class="iv-text-button" type="button">Back to invoice</button><button id="edit-invoice" class="iv-text-button" type="button" hidden>Edit invoice</button></div>
             <h1 id="result-heading" tabindex="-1">Invoice ready</h1>
             <div class="pdf-file"><Icon name="invoice" /><div><strong id="result-filename"></strong><p id="result-description"></p></div><span id="result-payment-status" class="iv-small-badge"></span></div>
             <p id="sheet-save-status" class="field-help" role="status"></p>
-            <p id="invoice-edit-status" class="field-help" role="status" hidden>Unsaved edits are kept on this device. Choose Edit invoice to resume.</p>
             <p class="field-help iv-preview-profile">Uses your latest business details, labels and signature.</p>
-            <div class="iv-export-format"><span id="result-format-label">File format</span><div class="iv-status-filters" role="group" aria-labelledby="result-format-label"><button type="button" data-export-format="pdf" aria-pressed="true">PDF</button><button type="button" data-export-format="jpg" aria-pressed="false">JPG</button></div><span id="result-format-status" class="field-help" role="status"></span></div>
+            <div class="iv-export-toolbar">
+              <div class="iv-export-format"><span id="result-format-label">File format</span><div class="iv-status-filters" role="group" aria-labelledby="result-format-label"><button type="button" data-export-format="pdf" aria-pressed="true">PDF</button><button type="button" data-export-format="jpg" aria-pressed="false">JPG</button></div></div>
+              <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button"><Icon name="share" /><span>Share PDF</span></button><a id="download-pdf" class="iv-button" download><span>Download</span><Icon name="download" /></a></div>
+            </div>
+            <p id="result-format-status" class="field-help" role="status"></p>
             <p id="result-error" class="notice" role="alert" hidden></p>
-            <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button"><Icon name="share" /><span>Share PDF</span></button><a id="download-pdf" class="iv-button" download><span>Download</span><Icon name="download" /></a></div>
             <p id="share-help" class="field-help"></p><p id="share-status" class="field-help" role="status"></p>
             <h2 class="iv-preview-heading">Invoice preview</h2>
             <p id="preview-unavailable" class="field-help" hidden>The preview could not load. You can still save or share the PDF.</p>
@@ -166,6 +168,8 @@ const googleConfig = {
       </main>
       <footer class="iv-site-footer"><a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></footer>
     </div>
+    <template id="history-edit-icon"><Icon name="edit" /></template>
+    <template id="history-delete-icon"><Icon name="trash" /></template>
     <template id="item-template"><div class="iv-item invoice-item"><div><label class="description-label">Description</label><input class="item-description" placeholder="Item or service description" maxlength="240" required /></div><div><label class="quantity-label">Qty</label><input class="item-quantity" type="number" inputmode="numeric" min="1" max="999" step="1" required /></div><div><label class="price-label">Unit price</label><input class="item-price" type="number" inputmode="decimal" min="0" max="9999999.99" step="0.01" placeholder="0.00" required /></div><div class="line-total"><span>Amount</span><strong class="iv-item-total">S$0.00</strong></div><button class="iv-remove remove-item" type="button" aria-label="Remove item"><Icon name="trash" /></button></div></template>
     <script>import '../lib/invoice-client.mjs';</script>
   </body>

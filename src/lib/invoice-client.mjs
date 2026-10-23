@@ -224,7 +224,6 @@ function displayExport(result) {
   $('result-heading').textContent = record ? `Invoice ${snapshot.number}` : 'Invoice ready';
   $('result-back').textContent = record ? 'Back to transactions' : 'Back to invoice';
   $('edit-invoice').hidden = !record;
-  $('invoice-edit-status').hidden = !record || recordId !== record.id || baseRevision !== record.revision || !dirty;
   $('result-error').hidden = true; $('result-format-status').textContent = ''; $('share-status').textContent = '';
   document.querySelectorAll('[data-export-format]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.exportFormat === format)));
   $('whatsapp-summary').value = invoiceSummary(snapshot);
@@ -556,11 +555,11 @@ $("copy-summary").addEventListener("click", async () => {
     $("share-status").textContent = "Select and copy the summary above, then paste it into WhatsApp.";
   }
 });
-function startInvoice(selectedCustomer) {
+function startInvoice(selectedCustomer, { offerUndo = true, navigate = true } = {}) {
   let number;
-  try { number = suggestedNumber(); } catch (error) { errors([error.message]); return; }
+  try { number = suggestedNumber(); } catch (error) { if (navigate) { errors([error.message]); return; } }
   readForm();
-  resetUndo = dirty || baseRevision || (generated && !generated.record) ? structuredClone({ invoice, automaticNumber, recordId, recordRevision, baseRevision, customerId, dirty, recordWorkbookId, editReturnRecord }) : resetUndo;
+  resetUndo = offerUndo ? (dirty || baseRevision || (generated && !generated.record) ? structuredClone({ invoice, automaticNumber, recordId, recordRevision, baseRevision, customerId, dirty, recordWorkbookId, editReturnRecord }) : resetUndo) : null;
   editReturnRecord = null;
   $('history-feedback').textContent = ''; $('history-feedback').hidden = true;
   const seller = { ...business };
@@ -571,7 +570,7 @@ function startInvoice(selectedCustomer) {
     const customer = workbook?.customers.find(customer => customer.id === selectedCustomer);
     if (customer) { customerId = customer.id; invoice.customer = { name: customer.name, phone: customer.phone, address: customer.address }; fillForm(); renderCloudRecords(); persist(); }
   }
-  showView('invoice'); $('saved-customer-field').hidden ? $('customer-name').focus() : $('saved-customer').focus();
+  if (navigate) { showView('invoice'); $('saved-customer-field').hidden ? $('customer-name').focus() : $('saved-customer').focus(); }
 }
 $('new-invoice').addEventListener('click', () => startInvoice());
 $('undo-reset').addEventListener('click', () => {
@@ -582,13 +581,11 @@ $('undo-reset').addEventListener('click', () => {
 });
 $('close-edit').addEventListener('click', async () => {
   if (googleBusy || generating || sharing) return;
-  readForm(); persist();
-  if (editReturnRecord && workbook?.invoices.some(record => record.id === editReturnRecord.id)) {
-    await openRecord(editReturnRecord);
-  } else {
-    showView('history');
-    if (dirty) { $('history-feedback').textContent = `Edits for ${invoice.number} kept on this device. Choose Edit on this invoice to resume.`; $('history-feedback').hidden = false; }
-  }
+  const returnRecord = editReturnRecord;
+  // Closing ends the edit. The Invoice tab must no longer contain that saved transaction.
+  startInvoice(undefined, { offerUndo: false, navigate: false });
+  showView('history');
+  if (returnRecord && workbook?.invoices.some(record => record.id === returnRecord.id)) await openRecord(returnRecord);
 });
 $('history-new-invoice').addEventListener('click', () => startInvoice($('history-customer').value));
 $("clear-device").addEventListener("click", () => {
@@ -748,13 +745,13 @@ function renderHistory() {
     const status = document.createElement('div'); status.className = 'iv-history-status';
     const badge = document.createElement('span'); badge.className = `iv-small-badge iv-badge-${paid ? 'paid' : 'unpaid'}`; badge.textContent = paid ? 'Paid' : 'Unpaid'; status.append(badge);
     const actions = document.createElement('div'); actions.className = 'iv-history-actions';
-    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'iv-text-button'; edit.textContent = 'Edit'; edit.setAttribute('aria-label', `Edit invoice ${saved.number}`);
+    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'iv-text-button iv-history-icon'; edit.append($('history-edit-icon').content.cloneNode(true)); edit.title = `Edit invoice ${saved.number}`; edit.setAttribute('aria-label', `Edit invoice ${saved.number}`);
     edit.addEventListener('click', () => openRecord(record, { edit: true })); actions.append(edit);
     if (!paid) {
       const pay = document.createElement('button'); pay.type = 'button'; pay.className = 'iv-text-button'; pay.textContent = 'Mark paid'; pay.setAttribute('aria-label', `Mark invoice ${saved.number} paid`);
       pay.addEventListener('click', () => markRecordPaid(record)); actions.append(pay);
     }
-    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'iv-text-button iv-danger-text'; remove.textContent = 'Delete'; remove.setAttribute('aria-label', `Delete invoice ${saved.number}`);
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'iv-text-button iv-danger-text iv-history-icon'; remove.append($('history-delete-icon').content.cloneNode(true)); remove.title = `Delete invoice ${saved.number}`; remove.setAttribute('aria-label', `Delete invoice ${saved.number}`);
     remove.addEventListener('click', () => {
       pendingDeletion = { record: structuredClone(record), workbookId: workbook.id };
       $('delete-transaction-description').textContent = `Delete invoice ${saved.number} for ${saved.customer.name} (${formatMoney(invoiceTotal(saved))}) from your transactions? Customer details stay saved. You can undo this deletion here.`;

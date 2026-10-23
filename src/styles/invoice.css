@@ -90,8 +90,12 @@ body { margin:0; }
   .invoice-app .iv-small-badge { display:inline-block; font-size:10px; font-weight:500; border-radius:4px; padding:3px 7px; white-space:nowrap; }
   .invoice-app .iv-badge-paid { color:var(--iv-paid-text); background:var(--iv-paid-bg); }
   .invoice-app .iv-badge-unpaid { color:var(--iv-unpaid-text); background:var(--iv-unpaid-bg); }
-  .invoice-app .iv-history-actions { position:relative; z-index:1; display:flex; flex-wrap:wrap; gap:11px; justify-content:end; }
+  .invoice-app .iv-history-actions { position:relative; z-index:1; display:grid; grid-template-columns:44px 70px 44px; gap:11px; justify-content:end; }
   .invoice-app .iv-history-actions button { font-size:11px; min-height:44px; }
+  .invoice-app .iv-history-actions>.iv-danger-text { grid-column:3; }
+  .invoice-app .iv-history-icon { width:44px; min-width:44px; justify-content:center; border-radius:5px; }
+  .invoice-app .iv-history-icon svg { width:17px; height:17px; }
+  .invoice-app .iv-history-icon:hover { background:var(--iv-soft); }
   .invoice-app .iv-row-open { position:absolute; inset:0; z-index:0; width:100%; border:0; border-radius:5px; padding:0; background:transparent; cursor:pointer; }
   .invoice-app .iv-row-open:focus-visible { outline:2px solid var(--iv-accent); outline-offset:2px; }
   .invoice-app .iv-history-row:has(.iv-row-open:hover) { background:var(--iv-soft); }
@@ -195,8 +199,9 @@ body { margin:0; }
 .invoice-app .iv-export-navigation { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
 .invoice-app .iv-signature-preview { display:block; max-width:240px; width:100%; height:80px; object-fit:contain; object-position:left center; margin-top:12px; border:1px solid var(--iv-line); background:white; }
 .invoice-app #result-heading { margin-bottom:20px; overflow-wrap:anywhere; }
-.invoice-app .iv-export-format { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:20px; font-size:12px; }
-.invoice-app .iv-export-format .field-help { margin:0; }
+.invoice-app .iv-export-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px 20px; margin-top:20px; }
+.invoice-app .iv-export-format { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:12px; }
+.invoice-app #result-format-status:empty { display:none; }
 .invoice-app .iv-preview-profile { margin-top:12px; }
 .invoice-app .iv-sheet-choice { margin-top:20px; }
 .invoice-app .iv-sheet-choice h3 { font-size:14px; margin:0 0 12px; }
@@ -212,7 +217,7 @@ body { margin:0; }
 .invoice-app .pdf-file>div { flex:1; min-width:0; overflow-wrap:anywhere; }
 .invoice-app .pdf-file strong { font-weight:500; font-size:14px; }
 .invoice-app .pdf-file p { color:var(--iv-muted); font-size:12px; margin-top:4px; }
-.invoice-app .pdf-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; }
+.invoice-app .pdf-actions { display:flex; gap:10px; flex-wrap:wrap; margin-left:auto; }
 .invoice-app .iv-preview-heading { margin-top:24px; font-size:14px; }
 .invoice-app .invoice-image-preview { display:block; width:100%; height:auto; margin-top:12px; border:1px solid var(--iv-line); background:white; }
 .invoice-app .summary-area { border-top:1px solid var(--iv-line); padding-top:15px; margin-top:22px; }
@@ -223,8 +228,8 @@ body { margin:0; }
   .invoice-app .iv-history-actions button { min-height:44px; }
   .invoice-app .sheet-create>div,.invoice-app .sheet-existing>div { flex-basis:100%; min-width:0; }
   .invoice-app .sheet-create .iv-button,.invoice-app .sheet-existing .iv-button { width:100%; }
-  .invoice-app .pdf-actions>.iv-primary { width:100%; }
-  .invoice-app .pdf-actions>a { flex:1; }
+  .invoice-app .iv-export-toolbar .pdf-actions { width:100%; margin-left:0; }
+  .invoice-app .pdf-actions>.iv-button { flex:1; min-width:0; white-space:normal; }
 }
 @container (max-width:360px) {
   .invoice-app .iv-meta-grid { grid-template-columns:1fr; }
