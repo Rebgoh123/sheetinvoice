@@ -44,7 +44,6 @@ const googleConfig = {
             <div id="connect-hint" class="connect-hint"><span id="connect-hint-text">Connect Google to save invoices.</span><button class="iv-text-button" type="button" data-open-settings>Connect</button></div>
             <div id="error-box" class="notice" role="alert" tabindex="-1" hidden></div>
             <form id="invoice-form">
-              <section id="quick-items" class="iv-quick-items" aria-labelledby="quick-items-heading" hidden><h2 id="quick-items-heading">Saved items</h2><div id="saved-item-tags" class="iv-item-tags" role="group" aria-label="Tap to add saved items"></div><p id="quick-add-status" class="sr-only" role="status"></p></section>
               <div class="iv-customer-grid">
                 <div>
                   <div class="iv-label-row"><label id="customer-label" for="customer-name">Customer</label><button id="new-customer" class="iv-text-button" type="button" hidden>+ New customer</button></div>
@@ -56,6 +55,7 @@ const googleConfig = {
               <div class="iv-field"><label for="customer-address">Service address</label><textarea id="customer-address" name="customerAddress" rows="1" autocomplete="street-address" placeholder="Address for this job" maxlength="400"></textarea></div>
               <div class="iv-meta-grid"><div><label for="invoice-number">Invoice number</label><input id="invoice-number" name="invoiceNumber" maxlength="70" required /></div><div><label for="invoice-date">Date</label><input id="invoice-date" name="invoiceDate" type="date" required /></div></div>
               <section class="iv-items" aria-labelledby="items-heading">
+                <section id="quick-items" class="iv-quick-items" aria-labelledby="quick-items-heading" hidden><h2 id="quick-items-heading">Saved items</h2><div id="saved-item-tags" class="iv-item-tags" role="group" aria-label="Tap to add saved items"></div><p id="quick-add-status" class="sr-only" role="status"></p></section>
                 <div class="iv-section-heading"><h2 id="items-heading">Items</h2><span>SGD</span></div>
                 <div class="iv-item-head" aria-hidden="true"><span>Description</span><span>Qty</span><span>Unit price</span><span class="iv-right">Amount</span><span></span></div>
                 <div id="items"></div>
@@ -119,7 +119,7 @@ const googleConfig = {
               <p id="saved-items-status" class="field-help" role="status"></p>
               <p id="saved-items-warning" class="notice" role="status" hidden></p>
               <div class="sheet-actions"><button id="setup-saved-items" class="iv-button" type="button">Set up saved items</button><a id="edit-saved-items" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
-              <p class="field-help">After editing the Sheet, select Refresh records above. Tap a saved-item tag at the top of an invoice to add it. Tap again to increase the quantity.</p>
+              <p class="field-help">After editing the Sheet, select Refresh records above. Tap a saved-item tag below the customer details to add it. Tap again to increase the quantity.</p>
             </section>
             <section id="design-settings" class="iv-setting-section" aria-labelledby="design-heading" hidden>
               <h2 id="design-heading">Invoice design</h2>
