@@ -23,6 +23,8 @@ export function loadDevice(storage) {
       typeof item.price === 'string' && (item.price === '' || priceInCents(item.price) !== null))
       .map(({ description, quantity, price }) => ({ description, quantity, price })) : [];
     return { invoice, business: normalizeSeller(saved.business), design: normalizeDesign(saved.design),
+      numberStart: typeof saved.numberStart === 'string' ? saved.numberStart.slice(0, 70) : '',
+      automaticNumber: typeof saved.automaticNumber === 'string' && saved.automaticNumber === invoice.number ? invoice.number : null,
       savedItems: workbookId ? items : [], accountId, workbookId,
       recordId: uuid(saved.recordId) ? saved.recordId : crypto.randomUUID(),
       recordRevision: uuid(saved.recordRevision) ? saved.recordRevision : crypto.randomUUID(),

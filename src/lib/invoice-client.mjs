@@ -1,6 +1,7 @@
 import {
   MAX_ITEMS, newInvoice, normalizeSeller, validateSeller, invoiceTotal, lineTotal,
   formatMoney, displayDate, validateInvoice, invoiceSummary, whatsappUrl, invoiceFilename, priceInCents,
+  nextInvoiceNumber, invoiceNumberStartError,
 } from "./invoice.mjs";
 import { InvoiceSheets, SAVED_ITEMS_TAB, DESIGN_TAB } from './invoice-sheets.mjs';
 import { normalizeDesign } from './invoice-design.mjs';
@@ -14,6 +15,8 @@ function stored(key) { try { return localStorage.getItem(key); } catch { return 
 const remembered = loadDevice();
 let forgetMarker = stored(FORGET_KEY);
 let invoice = remembered?.invoice || newInvoice();
+let automaticNumber = remembered ? remembered.automaticNumber : invoice.number;
+let numberStart = remembered?.numberStart || '';
 let business = remembered?.business || normalizeSeller(), profileDirty = remembered?.profileDirty || false;
 let cachedItems = remembered?.savedItems || [], cachedDesign = remembered?.design || normalizeDesign(), cacheAccountId = remembered?.accountId || null, deviceSaved = false;
 if (!invoice.items.length) invoice.items.push({ description: "", quantity: "1", price: "" });
@@ -36,15 +39,37 @@ const fields = {
 const sellerFields = { name: 'seller-name', address: 'seller-address', contact: 'seller-contact', phone: 'seller-phone', email: 'seller-email', registration: 'seller-registration', payment: 'seller-payment', terms: 'seller-terms', reviewUrl: 'seller-review-url' };
 function fillBusinessForm() {
   for (const [key, id] of Object.entries(sellerFields)) $(id).value = business[key];
+  $('invoice-number-start').value = numberStart;
+  updateNumberingWarning();
 }
 function readBusinessForm() {
   business = normalizeSeller(Object.fromEntries(Object.entries(sellerFields).map(([key, id]) => [key, $(id).value])));
+  numberStart = $('invoice-number-start').value.trim();
+  updateNumberingWarning();
 }
-function resetBusinessProfile() { business = normalizeSeller(); profileDirty = false; fillBusinessForm(); }
-function businessChanged() {
-  readBusinessForm(); profileDirty = true; invoice.seller = { ...business };
-  revision++; recordRevision = crypto.randomUUID(); dirty = true;
-  discardPdf(); errors(); persist();
+function updateNumberingWarning(message = invoiceNumberStartError(numberStart)) {
+  $('invoice-number-start').setCustomValidity(invoiceNumberStartError(numberStart));
+  $('numbering-warning').textContent = message;
+  $('numbering-warning').hidden = !message;
+}
+function suggestedNumber(next = workbook) { return next ? nextInvoiceNumber(next.numberStart, next.tables.Invoices.map(row => row[3])) : null; }
+function applyNumbering(next) {
+  if (baseRevision || automaticNumber !== invoice.number || next.tables.Invoices.some(row => row[0] === recordId)) return;
+  try {
+    const number = suggestedNumber(next);
+    if (!number || number === invoice.number) return;
+    invoice.number = number; automaticNumber = number; $('invoice-number').value = number;
+    revision++; recordRevision = crypto.randomUUID(); discardPdf();
+  } catch (error) { updateNumberingWarning(error.message); }
+}
+function resetBusinessProfile() { business = normalizeSeller(); numberStart = ''; profileDirty = false; fillBusinessForm(); }
+function businessChanged(event) {
+  readBusinessForm(); profileDirty = true;
+  if (event.target.id !== 'invoice-number-start') {
+    invoice.seller = { ...business }; revision++; recordRevision = crypto.randomUUID(); dirty = true;
+    discardPdf(); errors();
+  }
+  persist();
   $('business-save-status').textContent = workbook ? 'Saved on this device. Save business details to update your Sheet.' : 'Remembered on this device. Connect a Sheet to sync your defaults.';
 }
 function showView(view, focus = true) {
@@ -101,7 +126,7 @@ function persist() {
   if (googleUser) cacheAccountId = googleUser.id;
   if (workbook) { cachedItems = workbook.savedItems; cachedDesign = normalizeDesign(workbook.design); }
   const hasData = dirty || profileDirty || recordWorkbookId || Object.values(business).some(value => value.trim()) || cachedItems.length || Object.values(invoice.customer).some(value => value.trim()) || invoice.items.some(item => !isBlankItem(item)) || invoice.notes.trim();
-  deviceSaved = saveDevice(hasData ? { invoice, business, design: cachedDesign, savedItems: cachedItems, accountId: cacheAccountId, workbookId: recordWorkbookId,
+  deviceSaved = saveDevice(hasData ? { invoice, business, numberStart, automaticNumber, design: cachedDesign, savedItems: cachedItems, accountId: cacheAccountId, workbookId: recordWorkbookId,
     recordId, recordRevision, baseRevision, customerId, dirty, profileDirty } : null);
   $('device-storage-status').textContent = deviceSaved ? '' : 'This browser could not save on this device. Keep the tab open or save to Google Sheets.';
   $('draft-status').textContent = dirty ? (deviceSaved ? 'Saved on device' : 'Unsaved changes') : '';
@@ -131,7 +156,8 @@ function discardPdf() {
   if (activeView === 'pdf') showView('invoice', false);
   if (!generating) $("generate-pdf").querySelector("span").textContent = pdfLabel();
 }
-function changed() {
+function changed(event) {
+  if (event?.target?.id === 'invoice-number') automaticNumber = null;
   readForm(); revision++; recordRevision = crypto.randomUUID(); dirty = true;
   const selected = workbook?.customers.find(customer => customer.id === customerId);
   if (selected && selected.name !== invoice.customer.name) { customerId = null; $('saved-customer').value = ''; }
@@ -370,9 +396,13 @@ $("copy-summary").addEventListener("click", async () => {
   }
 });
 function startInvoice(selectedCustomer) {
+  let number;
+  try { number = suggestedNumber(); } catch (error) { errors([error.message]); return; }
   if ((dirty || generated) && !window.confirm('Replace this invoice with a new one? Save it to Sheets first if you need to keep it.')) return;
   readForm(); const seller = { ...business };
-  revision++; recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); customerId = null; dirty = false; $('saved-customer').value = ''; discardPdf(); errors(); invoice = newInvoice(seller, undefined, sheetDesign()); fillForm(); persist(); updateCloudControls();
+  revision++; recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); customerId = null; dirty = false; $('saved-customer').value = ''; discardPdf(); errors(); invoice = newInvoice(seller, undefined, sheetDesign());
+  if (number) invoice.number = number;
+  automaticNumber = invoice.number; fillForm(); persist(); updateCloudControls();
   if (selectedCustomer) {
     const customer = workbook?.customers.find(customer => customer.id === selectedCustomer);
     if (customer) { customerId = customer.id; invoice.customer = { name: customer.name, phone: customer.phone, address: customer.address }; fillForm(); renderCloudRecords(); persist(); }
@@ -400,6 +430,7 @@ fillBusinessForm(); fillForm(); renderSavedItems(); $("invoice-app").hidden = fa
 function resetWorkingData() {
   cachedItems = []; cachedDesign = normalizeDesign(); cacheAccountId = null; recordWorkbookId = null;
   resetBusinessProfile(); invoice = newInvoice(); dirty = false; customerId = null;
+  automaticNumber = invoice.number;
   recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); revision++; discardPdf(); fillForm();
 }
 function disconnectAndClear(broadcast = true) {
@@ -526,7 +557,7 @@ function renderHistory() {
 }
 function openRecord(record) {
   if (googleBusy || generating || (dirty && !window.confirm('Open this invoice and discard your unsaved changes?'))) return false;
-  invoice = structuredClone(record.invoice); invoice.status ||= 'unpaid'; recordId = record.id; recordRevision = record.revision; baseRevision = record.revision; customerId = record.customerId; dirty = false; revision++; discardPdf(); errors(); fillForm(); renderCloudRecords(); persist(); showView('invoice');
+  invoice = structuredClone(record.invoice); automaticNumber = null; invoice.status ||= 'unpaid'; recordId = record.id; recordRevision = record.revision; baseRevision = record.revision; customerId = record.customerId; dirty = false; revision++; discardPdf(); errors(); fillForm(); renderCloudRecords(); persist(); showView('invoice');
   return true;
 }
 async function markRecordPaid(record) {
@@ -557,12 +588,16 @@ function useWorkbook(next) {
   const changedWorkbook = recordWorkbookId !== next.id;
   recordWorkbookId = next.id;
   workbook = next; cachedItems = next.savedItems; cachedDesign = normalizeDesign(next.design); requiresSheetSave = true;
-  if (!profileDirty || changedWorkbook) { business = normalizeSeller(next.seller); profileDirty = false; fillBusinessForm(); }
+  if (!profileDirty || changedWorkbook) { business = normalizeSeller(next.seller); numberStart = next.numberStart; profileDirty = false; fillBusinessForm(); }
+  if (next.numberingWarning) {
+    updateNumberingWarning(next.numberingWarning); $('business-defaults').open = true; $('invoice-number-start').closest('details').open = true;
+  }
   if (!business.name.trim()) $('business-defaults').open = true;
   if ((!dirty && !baseRevision) || changedWorkbook) { invoice.seller = { ...business }; fillForm(); }
   if ((!baseRevision || changedWorkbook) && JSON.stringify(invoice.design) !== JSON.stringify(next.design)) {
     invoice.design = normalizeDesign(next.design); revision++; recordRevision = crypto.randomUUID(); discardPdf();
   }
+  applyNumbering(next);
   $('sheet-setup').hidden = true; $('sheet-connected').hidden = false;
   $('connected-sheet-name').textContent = next.name;
   $('open-sheet').href = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(next.id)}/edit`;
@@ -630,7 +665,7 @@ $('disconnect-google').addEventListener('click', () => {
 $('create-sheet-form').addEventListener('submit', event => { event.preventDefault(); cloudAction(async () => {
   readForm(); readBusinessForm(); const active = sheets, epoch = connectionEpoch;
   $('google-status').textContent = 'Creating your private invoice Sheet…';
-  const next = await active.create($('sheet-name').value, business);
+  const next = await active.create($('sheet-name').value, business, numberStart);
   if (epoch === connectionEpoch) { finishSheetConnection(next); $('business-save-status').textContent = business.name.trim() ? '' : 'Add your business name, then start invoicing.'; }
 }); });
 $('existing-sheet').addEventListener('change', updateCloudControls);
@@ -675,8 +710,8 @@ $('business-form').addEventListener('submit', event => { event.preventDefault();
   if (errors.length) throw new Error(errors.join(' '));
   if (!workbook || !sheets) { persist(); $('business-save-status').textContent = 'Remembered on this device. Connect a Sheet to sync your defaults.'; return; }
   const firstDetails = !workbook.seller.name.trim();
-  const epoch = connectionEpoch, next = await sheets.saveSeller(workbook.id, business);
-  if (epoch === connectionEpoch) { workbook = next; profileDirty = false; persist(); $('business-save-status').textContent = 'Business details saved to this Google Sheet.'; if (firstDetails) showView('invoice'); }
+  const epoch = connectionEpoch, next = await sheets.saveSeller(workbook.id, business, numberStart);
+  if (epoch === connectionEpoch) { workbook = next; profileDirty = false; applyNumbering(next); persist(); $('business-save-status').textContent = 'Business details saved to this Google Sheet.'; if (firstDetails) showView('invoice'); }
 }); });
 window.addEventListener('beforeunload', event => { if ((dirty || profileDirty) && !deviceSaved) { event.preventDefault(); event.returnValue = ''; } });
 window.addEventListener('focus', () => {

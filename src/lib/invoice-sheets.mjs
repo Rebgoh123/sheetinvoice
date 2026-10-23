@@ -1,4 +1,4 @@
-import { normalizeSeller, sellerLimits, priceInCents, restoreDraft, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber } from './invoice.mjs';
+import { normalizeSeller, sellerLimits, priceInCents, restoreDraft, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber, invoiceNumberStartError } from './invoice.mjs';
 import { DESIGN_SETTINGS, normalizeDesign, validateDesign } from './invoice-design.mjs';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -17,6 +17,7 @@ const optionalTables = { [SAVED_ITEMS_TAB]: SAVED_ITEMS_HEADER, [DESIGN_TAB]: ['
 const designRows = () => Object.values(DESIGN_SETTINGS).map(setting => [setting.label, setting.value, setting.options]);
 const businessKeys = { name: 'Business name', address: 'Business address', contact: 'Contact name', phone: 'Business phone', email: 'Business email', registration: 'UEN / registration', payment: 'Payment instructions', terms: 'Invoice footer', reviewUrl: 'Review link' };
 const businessRows = seller => Object.entries(businessKeys).map(([key, label]) => [label, normalizeSeller(seller)[key]]);
+const NUMBER_START = 'Invoice number start';
 const SHEETS = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 const idPattern = /^[a-zA-Z0-9_-]{10,200}$/;
@@ -56,6 +57,7 @@ export function parseWorkbook(metadata, ranges) {
     tables[title] = values.slice(1);
   }
   const settings = Object.fromEntries(tables.Settings);
+  const numberStart = String(settings[NUMBER_START] ?? '').trim();
   if (!supportedVersions.has(settings.schema)) throw new SheetsError('This workbook uses an unsupported invoice format.', 'schema');
   // Read older JSON profiles, with readable Settings rows taking precedence when present.
   let seller;
@@ -79,7 +81,7 @@ export function parseWorkbook(metadata, ranges) {
     if (!uuidPattern.test(values[0] || '') || typeof values[1] !== 'string' || !values[1].trim()) continue;
     customers.set(values[0], { id: values[0], name: values[1].slice(0, 120), phone: String(values[2] || '').slice(0, 40), address: String(values[3] || '').slice(0, 400) });
   }
-  return { id: metadata.spreadsheetId, name: metadata.properties.title, tabs, tables, seller, design: design.value, designWarning: design.warning, savedItems: catalog.items, savedItemsWarning: catalog.warning,
+  return { id: metadata.spreadsheetId, name: metadata.properties.title, tabs, tables, seller, numberStart, numberingWarning: invoiceNumberStartError(numberStart), design: design.value, designWarning: design.warning, savedItems: catalog.items, savedItemsWarning: catalog.warning,
     customers: [...customers.values()].sort((a, b) => a.name.localeCompare(b.name)),
     invoices: [...latest.values()].reverse() };
 }
@@ -198,8 +200,9 @@ export class InvoiceSheets {
     const values = await this.request(`${SHEETS}/${id}/values:batchGet?${query}`);
     return parseWorkbook(metadata, values.valueRanges || []);
   }
-  async create(name, seller) {
+  async create(name, seller, numberStart = '') {
     if (typeof name !== 'string' || !name.trim() || name.length > 100) throw new SheetsError('Enter a Sheet name (up to 100 characters).', 'validation');
+    if (invoiceNumberStartError(numberStart)) throw new SheetsError(invoiceNumberStartError(numberStart), 'validation');
     // Drive creates the file in My Drive, outside any shared folder. No sharing permission is added.
     const file = await this.request(DRIVE + '?fields=id', { method: 'POST', body: JSON.stringify({ name: name.trim(), mimeType: 'application/vnd.google-apps.spreadsheet' }) });
     await this.privateFile(file.id);
@@ -216,7 +219,7 @@ export class InvoiceSheets {
       requests.push(writeRow(sheetId, TABLES[title] || optionalTables[title], 0));
       requests.push({ repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.88, green: 0.94, blue: 0.91 } } }, fields: 'userEnteredFormat' } });
     }
-    requests.push({ updateCells: { start: { sheetId: ids.Settings, rowIndex: 1, columnIndex: 0 }, rows: [['schema', WORKBOOK_VERSION], ...businessRows(seller)].map(row), fields: 'userEnteredValue' } });
+    requests.push({ updateCells: { start: { sheetId: ids.Settings, rowIndex: 1, columnIndex: 0 }, rows: [['schema', WORKBOOK_VERSION], ...businessRows(seller), [NUMBER_START, numberStart]].map(row), fields: 'userEnteredValue' } });
     requests.push(...designSetup(ids[DESIGN_TAB]));
     // Hide the machine-readable invoice snapshot from the normal Sheet view.
     requests.push({ updateDimensionProperties: { range: { sheetId: ids.Invoices, dimension: 'COLUMNS', startIndex: 9, endIndex: 10 }, properties: { hiddenByUser: true }, fields: 'hiddenByUser' } });
@@ -237,12 +240,15 @@ export class InvoiceSheets {
     if (plan.requests.length) await this.request(`${SHEETS}/${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: plan.requests }) });
     return { customerId: plan.customerId, workbook: await this.load(id) };
   }
-  async saveSeller(id, seller) {
+  async saveSeller(id, seller, numberStart) {
     const errors = validateSeller(seller);
+    if (numberStart !== undefined && invoiceNumberStartError(numberStart)) errors.push(invoiceNumberStartError(numberStart));
     if (errors.length) throw new SheetsError(errors.join(' '), 'validation');
     const current = await this.load(id);
     const labels = new Set(['seller', ...Object.values(businessKeys)]);
+    if (numberStart !== undefined) labels.add(NUMBER_START);
     const values = [...current.tables.Settings.filter(values => !labels.has(values[0])), ...businessRows(seller)];
+    if (numberStart !== undefined) values.push([NUMBER_START, numberStart]);
     // Blank any obsolete JSON/duplicate profile rows while preserving unrelated settings.
     while (values.length < current.tables.Settings.length) values.push(['', '']);
     const request = { updateCells: { start: { sheetId: current.tabs.Settings, rowIndex: 1, columnIndex: 0 }, rows: values.map(row), fields: 'userEnteredValue' } };

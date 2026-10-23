@@ -44,6 +44,29 @@ export function newInvoice(seller = defaultSeller, now = new Date(), design) {
   };
 }
 
+export function invoiceNumberStartError(value) {
+  if (value === '') return '';
+  const parts = typeof value === 'string' && value.length <= 70 && !/[\r\n]/.test(value) && value.match(/^(.*?)(\d+)$/);
+  return parts && BigInt(parts[2]) > 0n ? '' : 'Use a starting invoice number ending in a positive number, such as 40108 or INV-0001 (up to 70 characters).';
+}
+
+export function nextInvoiceNumber(start, savedNumbers = []) {
+  if (!start) return null;
+  const error = invoiceNumberStartError(start);
+  if (error) throw new Error(error);
+  const [, prefix, digits] = start.match(/^(.*?)(\d+)$/);
+  let next = BigInt(digits);
+  for (const value of savedNumbers) {
+    const number = String(value ?? '').trim();
+    if (number.length > 70 || number.slice(0, prefix.length).toUpperCase() !== prefix.toUpperCase()) continue;
+    const suffix = number.slice(prefix.length);
+    if (/^\d+$/.test(suffix) && BigInt(suffix) >= next) next = BigInt(suffix) + 1n;
+  }
+  const result = prefix + String(next).padStart(digits.length, '0');
+  if (result.length > 70) throw new Error('This invoice number series is full. Choose a shorter starting number or a new prefix in Business details.');
+  return result;
+}
+
 // Work in integer cents: 0.10 + 0.20 must always produce exactly 0.30.
 export function priceInCents(value) {
   const input = String(value).trim();
