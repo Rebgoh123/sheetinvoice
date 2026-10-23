@@ -2,7 +2,7 @@ import {
   MAX_ITEMS, newInvoice, normalizeSeller, validateSeller, invoiceTotal, lineTotal,
   formatMoney, displayDate, validateInvoice, invoiceSummary, whatsappUrl, invoiceFilename,
 } from "./invoice.mjs";
-import { InvoiceSheets } from './invoice-sheets.mjs';
+import { InvoiceSheets, SAVED_ITEMS_TAB } from './invoice-sheets.mjs';
 import { prepareGoogle, preparePicker, chooseSheet } from './invoice-google.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -152,6 +152,27 @@ function updateTotals() {
     $('items').children[index].querySelector('.line-total strong').textContent = total === null ? '—' : formatMoney(total);
   });
   $('action-total').textContent = formatMoney(invoiceTotal(invoice));
+  updateSavedItemControl();
+}
+function updateSavedItemControl() {
+  $('saved-item').disabled = !workbook || googleBusy || generating || (invoice.items.length >= MAX_ITEMS && !invoice.items.some(isBlankItem));
+}
+function isBlankItem(item) { return !item.description.trim() && !item.price.trim() && item.quantity === '1'; }
+function renderSavedItems() {
+  const items = workbook?.savedItems || [];
+  $('saved-item').replaceChildren(new Option('Add a saved item…', ''));
+  items.forEach((item, index) => $('saved-item').add(new Option(`${item.description}${item.price ? ` · ${formatMoney(lineTotal({ ...item, quantity: '1' }))}` : ''}`, String(index))));
+  $('saved-item-field').hidden = !items.length;
+  $('saved-items-settings').hidden = !workbook;
+  const tab = workbook?.tabs[SAVED_ITEMS_TAB];
+  $('setup-saved-items').hidden = Number.isInteger(tab);
+  $('edit-saved-items').hidden = !Number.isInteger(tab);
+  $('edit-saved-items').removeAttribute('href');
+  if (Number.isInteger(tab)) $('edit-saved-items').href = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(workbook.id)}/edit#gid=${tab}`;
+  $('saved-items-status').textContent = workbook ? `${items.length} saved item${items.length === 1 ? '' : 's'} available.` : '';
+  $('saved-items-warning').textContent = workbook?.savedItemsWarning || '';
+  $('saved-items-warning').hidden = !workbook?.savedItemsWarning;
+  updateSavedItemControl();
 }
 
 form.addEventListener("input", changed);
@@ -162,6 +183,19 @@ $("add-item").addEventListener("click", () => {
   readForm(); if (invoice.items.length >= MAX_ITEMS) return;
   invoice.items.push({ description: "", quantity: "1", price: "" });
   renderItems(invoice.items.length - 1); changed();
+});
+$('saved-item').addEventListener('change', event => {
+  event.stopPropagation();
+  const selected = $('saved-item').value;
+  if (selected === '' || !workbook || googleBusy || generating) return;
+  const item = workbook.savedItems[Number(selected)];
+  $('saved-item').value = '';
+  if (!item) return;
+  readForm();
+  let index = invoice.items.findIndex(isBlankItem);
+  if (index < 0) { if (invoice.items.length >= MAX_ITEMS) return; index = invoice.items.length; }
+  invoice.items[index] = { ...item };
+  renderItems(index); changed();
 });
 async function completeInvoice({ pdf = true } = {}) {
   if (generating || (googleBusy && sheets)) return;
@@ -309,7 +343,8 @@ function updateCloudControls() {
   $('connect-google').disabled = (!tokenClient && !googleLoadFailed) || googleBusy || generating;
   $('connect-google').hidden = !!sheets;
   $('disconnect-google').hidden = !sheets && !googleUser;
-  for (const id of ['create-sheet', 'refresh-sheet', 'change-sheet', 'save-business-defaults', 'disconnect-google']) $(id).disabled = googleBusy || generating;
+  for (const id of ['create-sheet', 'refresh-sheet', 'change-sheet', 'save-business-defaults', 'setup-saved-items', 'disconnect-google']) $(id).disabled = googleBusy || generating;
+  updateSavedItemControl();
   $('choose-sheet').disabled = !pickerReady || !sheets || googleBusy || generating;
   $('use-existing-sheet').disabled = !sheets || !$('existing-sheet').value || googleBusy || generating;
   $('generate-pdf').disabled = generating || (googleBusy && !!sheets) || (requiresSheetSave && !workbook);
@@ -360,7 +395,7 @@ function renderCloudRecords() {
     historyStatus = 'all'; historyPage = 0; paymentRetries.clear();
     $('history-feedback').textContent = ''; $('history-feedback').hidden = true;
   }
-  updateCustomerControls(); renderHistory();
+  updateCustomerControls(); renderHistory(); renderSavedItems();
   $('history-count').textContent = workbook ? String(workbook.invoices.length) : '';
   $('history-count').hidden = !workbook;
   $('save-business-defaults').hidden = !workbook;
@@ -501,6 +536,11 @@ $('existing-sheet').addEventListener('change', updateCloudControls);
 $('use-existing-sheet').addEventListener('click', () => cloudAction(async () => { const epoch = connectionEpoch, next = await sheets.load($('existing-sheet').value); if (epoch === connectionEpoch) useWorkbook(next); }));
 $('choose-sheet').addEventListener('click', () => cloudAction(async () => { const epoch = connectionEpoch, id = await chooseSheet(googleConfig, sheets.token); if (!id || epoch !== connectionEpoch) return; const next = await sheets.load(id); if (epoch === connectionEpoch) useWorkbook(next); }));
 $('refresh-sheet').addEventListener('click', () => cloudAction(async () => { const epoch = connectionEpoch, next = await sheets.load(workbook.id); if (epoch === connectionEpoch) useWorkbook(next); }));
+$('setup-saved-items').addEventListener('click', () => cloudAction(async () => {
+  if (!workbook) return;
+  const epoch = connectionEpoch, next = await sheets.setupSavedItems(workbook.id);
+  if (epoch === connectionEpoch) useWorkbook(next);
+}));
 $('change-sheet').addEventListener('click', () => cloudAction(async () => {
   if ((dirty || profileDirty) && !window.confirm('Change Sheet and discard this unsaved draft?')) return;
   workbook = null; resetBusinessProfile(); invoice = newInvoice(); dirty = false; customerId = null; recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); revision++; discardPdf(); fillForm(); renderCloudRecords(); $('sheet-connected').hidden = true;

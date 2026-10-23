@@ -56,6 +56,7 @@ const googleConfig = {
               <div class="iv-meta-grid"><div><label for="invoice-number">Invoice number</label><input id="invoice-number" name="invoiceNumber" maxlength="70" required /></div><div><label for="invoice-date">Date</label><input id="invoice-date" name="invoiceDate" type="date" required /></div></div>
               <section class="iv-items" aria-labelledby="items-heading">
                 <div class="iv-section-heading"><h2 id="items-heading">Items</h2><span>SGD</span></div>
+                <div id="saved-item-field" class="iv-saved-item" hidden><label class="sr-only" for="saved-item">Add a saved item</label><select id="saved-item"><option value="">Add a saved item…</option></select></div>
                 <div class="iv-item-head" aria-hidden="true"><span>Description</span><span>Qty</span><span>Unit price</span><span class="iv-right">Amount</span><span></span></div>
                 <div id="items"></div>
                 <button id="add-item" class="iv-text-button iv-add-item" type="button"><Icon name="plus" />Add item</button>
@@ -100,7 +101,7 @@ const googleConfig = {
             </section>
             <section id="business-defaults" class="iv-setting-section" aria-labelledby="business-heading">
               <h2 id="business-heading">Business details</h2>
-              <p class="field-help">Saved in this Sheet and used for new invoices. Each Sheet has its own business profile.</p>
+              <p class="field-help">Save here to keep editable defaults in your Sheet’s Settings tab. After editing the Sheet, select Refresh records. Used for new invoices.</p>
               <form id="business-form">
                 <div class="iv-field"><label for="seller-name">Business name</label><input id="seller-name" name="sellerName" maxlength="120" required /></div>
                 <div class="iv-field"><label for="seller-address">Business address</label><textarea id="seller-address" name="sellerAddress" rows="2" maxlength="240"></textarea></div>
@@ -111,6 +112,14 @@ const googleConfig = {
                 <div class="iv-field"><label for="seller-review-url">Review link (optional)</label><input id="seller-review-url" name="sellerReviewUrl" type="url" maxlength="1000" placeholder="https://…" /><p class="field-help">Included in the WhatsApp message when filled in.</p></div>
                 <button id="save-business-defaults" class="iv-button" type="submit" hidden>Save business details</button><p id="business-save-status" class="field-help" role="status"></p>
               </form>
+            </section>
+            <section id="saved-items-settings" class="iv-setting-section" aria-labelledby="saved-items-heading" hidden>
+              <h2 id="saved-items-heading">Saved items</h2>
+              <p class="field-help">Add your usual items or services in the Sheet’s Saved items tab: description, quantity and unit price in SGD. Leave the price blank to enter it per invoice.</p>
+              <p id="saved-items-status" class="field-help" role="status"></p>
+              <p id="saved-items-warning" class="notice" role="status" hidden></p>
+              <div class="sheet-actions"><button id="setup-saved-items" class="iv-button" type="button">Set up saved items</button><a id="edit-saved-items" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
+              <p class="field-help">After editing the Sheet, select Refresh records above. Choose a saved item on an invoice to fill its description, quantity and price.</p>
             </section>
             <details class="iv-notes"><summary>This device</summary><div class="device-actions"><button id="clear-device" class="iv-text-button" type="button">Clear this tab’s data</button></div></details>
           </section>

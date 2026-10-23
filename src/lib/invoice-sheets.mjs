@@ -1,4 +1,4 @@
-import { normalizeSeller, restoreDraft, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber } from './invoice.mjs';
+import { normalizeSeller, sellerLimits, priceInCents, restoreDraft, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber } from './invoice.mjs';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 export const WORKBOOK_VERSION = 'sheetinvoice-v1';
@@ -9,6 +9,10 @@ export const TABLES = {
   'Invoice items': ['Invoice ID', 'Revision ID', 'Item', 'Description', 'Quantity', 'Unit price cents', 'Amount cents'],
   Settings: ['Key', 'Value'],
 };
+export const SAVED_ITEMS_TAB = 'Saved items';
+export const SAVED_ITEMS_HEADER = ['Description', 'Quantity', 'Unit price (SGD)'];
+const businessKeys = { name: 'Business name', address: 'Business address', contact: 'Contact name', phone: 'Business phone', email: 'Business email', registration: 'UEN / registration', payment: 'Payment instructions', terms: 'Invoice footer', reviewUrl: 'Review link' };
+const businessRows = seller => Object.entries(businessKeys).map(([key, label]) => [label, normalizeSeller(seller)[key]]);
 const SHEETS = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 const idPattern = /^[a-zA-Z0-9_-]{10,200}$/;
@@ -49,8 +53,13 @@ export function parseWorkbook(metadata, ranges) {
   }
   const settings = Object.fromEntries(tables.Settings);
   if (!supportedVersions.has(settings.schema)) throw new SheetsError('This workbook uses an unsupported invoice format.', 'schema');
+  // Read older JSON profiles, with readable Settings rows taking precedence when present.
   let seller;
   try { seller = normalizeSeller(JSON.parse(settings.seller)); } catch { seller = normalizeSeller(); }
+  for (const [key, label] of Object.entries(businessKeys)) {
+    if (Object.hasOwn(settings, label)) seller[key] = String(settings[label] ?? '').slice(0, sellerLimits[key]);
+  }
+  const catalog = parseSavedItems(Number.isInteger(tabs[SAVED_ITEMS_TAB]) ? ranges[Object.keys(TABLES).length]?.values || [] : null);
   // Rows are revisions. Append order is authoritative, including saves from another phone.
   const latest = new Map();
   for (const values of tables.Invoices) {
@@ -63,11 +72,28 @@ export function parseWorkbook(metadata, ranges) {
     if (!uuidPattern.test(values[0] || '') || typeof values[1] !== 'string' || !values[1].trim()) continue;
     customers.set(values[0], { id: values[0], name: values[1].slice(0, 120), phone: String(values[2] || '').slice(0, 40), address: String(values[3] || '').slice(0, 400) });
   }
-  return { id: metadata.spreadsheetId, name: metadata.properties.title, tabs, tables, seller,
+  return { id: metadata.spreadsheetId, name: metadata.properties.title, tabs, tables, seller, savedItems: catalog.items, savedItemsWarning: catalog.warning,
     customers: [...customers.values()].sort((a, b) => a.name.localeCompare(b.name)),
     invoices: [...latest.values()].reverse() };
 }
 function safeJson(value) { try { return JSON.parse(value); } catch { return null; } }
+
+function parseSavedItems(values) {
+  if (!values) return { items: [], warning: '' };
+  if (JSON.stringify(values[0]) !== JSON.stringify(SAVED_ITEMS_HEADER)) return { items: [], warning: 'Saved items could not be loaded. Keep the columns Description, Quantity and Unit price (SGD) in that order.' };
+  const items = [];
+  let invalid = 0, nonempty = 0;
+  for (const row of values.slice(1)) {
+    if (!row.some(value => String(value ?? '').trim())) continue;
+    nonempty++;
+    if (nonempty > 100) continue;
+    const description = String(row[0] ?? '').trim(), quantity = String(row[1] ?? '').trim() || '1', price = String(row[2] ?? '').trim();
+    if (!description || description.length > 240 || !/^\d{1,3}$/.test(quantity) || Number(quantity) < 1 || (price && priceInCents(price) === null)) { invalid++; continue; }
+    items.push({ description, quantity, price });
+  }
+  const warning = [invalid ? `${invalid} saved item ${invalid === 1 ? 'row was' : 'rows were'} skipped. Use a description up to 240 characters, quantity 1–999 and a price with up to two decimal places (or blank).` : '', nonempty > 100 ? 'Only the first 100 saved item rows are loaded.' : ''].filter(Boolean).join(' ');
+  return { items, warning };
+}
 
 export function planSave(workbook, { id, revision, baseRevision, customerId, invoice }, now = new Date()) {
   if (!uuidPattern.test(id || '') || !uuidPattern.test(revision || '')) throw new SheetsError('Invalid invoice record.', 'validation');
@@ -143,11 +169,13 @@ export class InvoiceSheets {
   async load(id) {
     await this.privateFile(id);
     const metadata = await this.request(`${SHEETS}/${id}?fields=spreadsheetId,properties(title),sheets(properties(sheetId,title,gridProperties(rowCount)))`);
-    const query = new URLSearchParams();
+    const query = new URLSearchParams({ valueRenderOption: 'UNFORMATTED_VALUE' });
     for (const title of Object.keys(TABLES)) {
       const rows = metadata.sheets.find(sheet => sheet.properties.title === title)?.properties.gridProperties?.rowCount || 1000;
       query.append('ranges', `'${title}'!A1:K${Math.min(rows, 10001)}`);
     }
+    const savedItems = metadata.sheets.find(sheet => sheet.properties.title === SAVED_ITEMS_TAB);
+    if (savedItems) query.append('ranges', `'${SAVED_ITEMS_TAB}'!A1:C${Math.min(savedItems.properties.gridProperties?.rowCount || 1000, 10001)}`);
     const values = await this.request(`${SHEETS}/${id}/values:batchGet?${query}`);
     return parseWorkbook(metadata, values.valueRanges || []);
   }
@@ -157,7 +185,7 @@ export class InvoiceSheets {
     const file = await this.request(DRIVE + '?fields=id', { method: 'POST', body: JSON.stringify({ name: name.trim(), mimeType: 'application/vnd.google-apps.spreadsheet' }) });
     await this.privateFile(file.id);
     const metadata = await this.request(`${SHEETS}/${file.id}?fields=sheets(properties(sheetId,title))`);
-    const titles = Object.keys(TABLES);
+    const titles = [...Object.keys(TABLES), SAVED_ITEMS_TAB];
     const requests = [];
     const first = metadata.sheets?.[0]?.properties;
     const ids = {};
@@ -166,10 +194,10 @@ export class InvoiceSheets {
       ids[title] = sheetId;
       if (index === 0 && first) requests.push({ updateSheetProperties: { properties: { sheetId, title, gridProperties: { frozenRowCount: 1 } }, fields: 'title,gridProperties.frozenRowCount' } });
       else requests.push({ addSheet: { properties: { sheetId, title, gridProperties: { rowCount: 1000, columnCount: 12, frozenRowCount: 1 } } } });
-      requests.push(writeRow(sheetId, TABLES[title], 0));
+      requests.push(writeRow(sheetId, TABLES[title] || SAVED_ITEMS_HEADER, 0));
       requests.push({ repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.88, green: 0.94, blue: 0.91 } } }, fields: 'userEnteredFormat' } });
     }
-    requests.push(writeRow(ids.Settings, ['schema', WORKBOOK_VERSION], 1), writeRow(ids.Settings, ['seller', JSON.stringify(normalizeSeller(seller))], 2));
+    requests.push({ updateCells: { start: { sheetId: ids.Settings, rowIndex: 1, columnIndex: 0 }, rows: [['schema', WORKBOOK_VERSION], ...businessRows(seller)].map(row), fields: 'userEnteredValue' } });
     // Hide the machine-readable invoice snapshot from the normal Sheet view.
     requests.push({ updateDimensionProperties: { range: { sheetId: ids.Invoices, dimension: 'COLUMNS', startIndex: 9, endIndex: 10 }, properties: { hiddenByUser: true }, fields: 'hiddenByUser' } });
     await this.request(`${SHEETS}/${file.id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests }) });
@@ -193,9 +221,22 @@ export class InvoiceSheets {
     const errors = validateSeller(seller);
     if (errors.length) throw new SheetsError(errors.join(' '), 'validation');
     const current = await this.load(id);
-    const index = current.tables.Settings.findIndex(values => values[0] === 'seller');
-    const request = writeRow(current.tabs.Settings, ['seller', JSON.stringify(normalizeSeller(seller))], index < 0 ? null : index + 1);
+    const labels = new Set(['seller', ...Object.values(businessKeys)]);
+    const values = [...current.tables.Settings.filter(values => !labels.has(values[0])), ...businessRows(seller)];
+    // Blank any obsolete JSON/duplicate profile rows while preserving unrelated settings.
+    while (values.length < current.tables.Settings.length) values.push(['', '']);
+    const request = { updateCells: { start: { sheetId: current.tabs.Settings, rowIndex: 1, columnIndex: 0 }, rows: values.map(row), fields: 'userEnteredValue' } };
     await this.request(`${SHEETS}/${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: [request] }) });
+    return this.load(id);
+  }
+  async setupSavedItems(id) {
+    const current = await this.load(id);
+    if (Number.isInteger(current.tabs[SAVED_ITEMS_TAB])) return current;
+    const sheetId = Math.max(...Object.values(current.tabs)) + 1;
+    await this.request(`${SHEETS}/${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: [
+      { addSheet: { properties: { sheetId, title: SAVED_ITEMS_TAB, gridProperties: { rowCount: 1000, columnCount: 3, frozenRowCount: 1 } } } },
+      writeRow(sheetId, SAVED_ITEMS_HEADER, 0),
+    ] }) });
     return this.load(id);
   }
 }

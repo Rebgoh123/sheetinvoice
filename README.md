@@ -12,6 +12,10 @@ There is no separate website account or password. The app is public; Google auth
 4. Return to **Invoice**, enter a customer and items, then **Save** or **Save & PDF**. New invoices are unpaid; tick **Mark as paid** when paid.
 5. Use **Past transactions** to filter by customer and payment status, open an invoice or mark it paid.
 
+To reuse items, open **Settings → Saved items → Edit in Google Sheet**. In the Sheet's **Saved items** tab, enter `Description`, `Quantity` and `Unit price (SGD)` under the existing column headings. Quantity defaults to 1 when blank; leave the price blank if it varies per invoice. Return to the app and choose **Refresh records**, then use **Add a saved item…** on an invoice. It fills a blank line or adds a new one; you can edit the values for that job. Up to 100 saved items are loaded per Sheet. Older workbooks get the tab through **Set up saved items**.
+
+Business defaults can also be edited directly in the Sheet's **Settings** tab: change the value beside Business name, Business address, Contact name, Business phone, Business email, UEN / registration, Payment instructions, Invoice footer or Review link. Keep the labels and `schema` row intact, then **Refresh records** in the app. For older workbooks, save Business details once in the app to replace the old JSON profile with these readable rows. Customers already have their own editable **Customers** tab. Refresh loads Sheet changes; existing invoice snapshots are preserved.
+
 Each Sheet has its own business profile. New invoices use that profile. Saved invoices retain their original seller/customer snapshot; opening an old invoice does not replace the Sheet's business settings. Editing Business details also applies them to the current invoice; save the profile and invoice separately when appropriate.
 
 PDFs are created in the browser. **Share PDF** opens the device share menu; select WhatsApp and confirm the recipient yourself. Some receiving apps omit text when sharing a file; **Copy message** and **Open WhatsApp** provide the same invoice message. The review request appears only when your business profile has a review URL. Desktop browsers can download the PDF for manual attachment.
@@ -78,7 +82,7 @@ The app includes a [Privacy & data page](https://rebgoh123.github.io/sheetinvoic
 
 ## Workbook and current limits
 
-The app creates **Customers**, **Invoices**, **Invoice items** and **Settings** tabs. Business details are stored as the `seller` JSON value in Settings; invoice snapshots preserve the profile at the time of saving. Do not reorder/rename app columns. Existing invoice workbooks with the legacy `nls-invoice-v1` schema can also be chosen; their data is read only after Google authorization. Arbitrary spreadsheet layouts are not imported or overwritten.
+The app creates **Customers**, **Invoices**, **Invoice items**, **Settings** and **Saved items** tabs. Business details use readable key/value rows in Settings; older `seller` JSON profiles remain readable until saved in the new format. Invoice snapshots preserve the profile and items at the time of saving. Saved items is optional for existing workbooks, and invalid preset rows are skipped with a warning in Settings. Do not reorder/rename app columns. Existing invoice workbooks with the legacy `nls-invoice-v1` schema can also be chosen; their data is read only after Google authorization. Arbitrary spreadsheet layouts are not imported or overwritten.
 
 This first version uses SGD, Singapore date/phone defaults, integer-cent totals and up to 40 items. It does not calculate tax, deposits or discounts. Invoice numbers are editable and unique within the selected workbook, not centrally sequential. Save retries use stable revision IDs. Concurrent editing has conflict detection but no transactional lock: avoid editing the same invoice on multiple devices at once. Customer updates are last-write-wins. Archive into a new workbook before reaching 10,000 rows per tab.
 
