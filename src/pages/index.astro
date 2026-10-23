@@ -71,7 +71,7 @@ const googleConfig = {
           </section>
           <section id="history-panel" class="iv-panel" role="tabpanel" aria-labelledby="history-tab" hidden>
             <div class="iv-title-row"><h1>Past transactions</h1><button id="history-new-invoice" class="iv-button iv-primary" type="button"><Icon name="plus" />New invoice</button></div>
-            <div id="history-connect" class="connect-hint"><span>Connect your Sheet to view transactions.</span><button class="iv-button iv-primary" type="button" data-connect-sheet disabled>Connect Google Sheet</button></div>
+            <div id="history-connect" class="connect-hint"><span id="history-connect-text">Connect your Sheet to view transactions.</span><button class="iv-button iv-primary" type="button" data-connect-sheet disabled>Connect Google Sheet</button></div>
             <div class="iv-history-filters">
               <div><label for="history-customer">Customer</label><select id="history-customer" disabled><option value="">All customers</option></select></div>
               <div><span id="history-status-label" class="field-label">Payment status</span><div class="iv-status-filters" role="group" aria-labelledby="history-status-label"><button type="button" data-status="all" aria-pressed="true">All</button><button type="button" data-status="unpaid" aria-pressed="false">Unpaid</button><button type="button" data-status="paid" aria-pressed="false">Paid</button></div></div>

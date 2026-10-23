@@ -452,7 +452,7 @@ function updateCloudControls() {
   $('disconnect-google').hidden = !sheets && !googleUser;
   $('connection-options').hidden = !sheets && !googleUser;
   $('change-sheet').hidden = !workbook;
-  const connectLabel = restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : requiresSheetSave ? 'Reconnect Google Sheet' : 'Connect Google Sheet';
+  const connectLabel = restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : requiresSheetSave ? 'Reconnect' : 'Connect Google Sheet';
   $('connect-google').textContent = connectLabel;
   for (const button of document.querySelectorAll('[data-connect-sheet]')) {
     button.disabled = $('connect-google').disabled;
@@ -477,7 +477,8 @@ function updateCloudControls() {
   $('connection-status').dataset.connected = String(!!workbook);
   $('connect-hint').hidden = !!workbook;
   $('history-connect').hidden = !!workbook;
-  $('connect-hint-text').textContent = requiresSheetSave ? 'Reconnect your Sheet to save this draft.' : 'Keep your invoices in your own Sheet.';
+  $('connect-hint-text').textContent = requiresSheetSave ? 'Reconnect to the same Sheet. Your draft stays here.' : 'Keep your invoices in your own Sheet.';
+  $('history-connect-text').textContent = requiresSheetSave ? 'Reconnect to load transactions from the same Sheet.' : 'Connect your Sheet to view transactions.';
 }
 function cloudError(error, { quiet = false, focus = true } = {}) {
   $('google-error').textContent = error.message || 'Google could not finish this action. Your draft is still here.';
@@ -490,7 +491,7 @@ function cloudError(error, { quiet = false, focus = true } = {}) {
     if (!expired) { forgetDevice(); forgetMarker = stored(FORGET_KEY); googleUser = null; requiresSheetSave = false; resetWorkingData(); }
     renderCloudRecords(); $('sheet-setup').hidden = true; $('sheet-connected').hidden = true;
     $('open-sheet').removeAttribute('href'); $('connected-sheet-name').textContent = ''; $('business-save-status').textContent = '';
-    $('google-status').textContent = expired ? 'Google disconnected. Your draft is remembered on this device. Reconnect to save to Sheets.' : 'Sheet access is unavailable. Remembered data has been cleared. Connect again after checking sharing settings.';
+    $('google-status').textContent = expired ? 'Tap Reconnect to reopen the same Sheet. Your draft is remembered on this device.' : 'Sheet access is unavailable. Remembered data has been cleared. Connect again after checking sharing settings.';
   }
   updateCloudControls(); persist();
   if (!quiet && focus) { $('google-error').focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
@@ -636,6 +637,7 @@ async function connected(token, restoring = false, interactive = false) {
   try {
     const nextUser = await active.user();
     if (epoch !== connectionEpoch) return;
+    const reconnecting = !!recordWorkbookId && nextUser.id === cacheAccountId;
     if (restoring && (nextUser.id !== token.accountId || (cacheAccountId && cacheAccountId !== nextUser.id))) {
       clearGoogleSession(); active.disconnect(); sheets = null; workbook = null; googleUser = null; renderCloudRecords();
       $('google-status').textContent = 'Connect your Google Sheet again to confirm the account. Your draft is still here.'; return;
@@ -656,7 +658,7 @@ async function connected(token, restoring = false, interactive = false) {
     const previous = recordWorkbookId || stored(`sheetinvoice-sheet-${googleUser.id}`);
     if (previous) {
       const next = await active.load(previous);
-      if (epoch === connectionEpoch) { if (restoring && !interactive) useWorkbook(next); else finishSheetConnection(next); }
+      if (epoch === connectionEpoch) { if (reconnecting || (restoring && !interactive)) useWorkbook(next); else finishSheetConnection(next); }
     } else { showView('settings', !restoring); await showSheetSetup(); }
   } catch (error) {
     if (epoch === connectionEpoch) {
@@ -678,14 +680,17 @@ function restoreGoogleConnection(interactive = false) {
   return true;
 }
 function connectSheet() {
-  showView('settings', false);
-  if (sheets) { $('sheet-setup').scrollIntoView({ block: 'nearest' }); return; }
+  if (sheets) { showView('settings', false); $('sheet-setup').scrollIntoView({ block: 'nearest' }); return; }
   if (googleBusy) return;
+  if (!recordWorkbookId) showView('settings', false);
   if (restoreGoogleConnection(true)) return;
   if (!tokenClient) { if (googleLoadFailed) initializeGoogle(); return; }
   googleBusy = true; $('google-error').hidden = true; updateCloudControls();
   loginEpoch = connectionEpoch;
-  tokenClient.requestAccessToken({ prompt: 'select_account', ...(googleUser ? { login_hint: googleUser.id } : {}) });
+  const accountId = googleUser?.id || cacheAccountId;
+  try {
+    tokenClient.requestAccessToken(accountId ? { prompt: '', login_hint: accountId } : { prompt: 'select_account' });
+  } catch (error) { googleBusy = false; loginEpoch = null; cloudError(error); }
 }
 $('connect-google').addEventListener('click', connectSheet);
 document.querySelectorAll('[data-connect-sheet]').forEach(button => button.addEventListener('click', connectSheet));
