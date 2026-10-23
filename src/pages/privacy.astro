@@ -22,7 +22,7 @@ const canonical = Astro.site ? new URL(`${base}privacy/`, Astro.site).href : nul
       <main id="main" class="iv-main">
         <article class="iv-panel privacy-content">
           <h1>Privacy &amp; data</h1>
-          <p><strong>Your Google Sheet stores your records. SheetInvoice reads and saves those records directly from your browser. It has no application backend that receives or stores your business details, customers, invoices or PDFs.</strong></p>
+          <p><strong>Your Google Sheet stores your records. SheetInvoice reads and saves those records directly from your browser. It has no application backend that receives or stores your business details, customers, invoices, PDFs or JPG images.</strong></p>
           <p>This does not mean the app never reads data: it needs to read your connected Sheet to display records, and write to it when you save.</p>
 
           <h2>What Google access is used for</h2>
@@ -34,12 +34,12 @@ const canonical = Astro.site ? new URL(`${base}privacy/`, Astro.site).href : nul
           <p>Keep your Sheet's General access Restricted. Its sharing permissions determine who can access it; SheetInvoice checks these permissions before loading or saving.</p>
 
           <h2>What stays in your browser</h2>
-          <p>Your current invoice (including customer details), business details, invoice design and saved-item tags are automatically saved in this browser’s local storage, so they survive refreshes and reopening the app. Invoice and revision IDs, the selected Sheet ID and your Google account ID are remembered to reconnect the draft to the correct workbook.</p>
+          <p>Your current invoice (including customer details), business details, invoice design and saved-item tags are automatically saved in this browser’s local storage, so they survive refreshes and reopening the app. Invoice and revision IDs, the selected Sheet ID and your Google account ID are remembered to reconnect the draft to the correct workbook. Your preferred PDF/JPG format is also remembered on this device.</p>
           <p>This is a readable copy on this device. Anyone using the same browser profile can see remembered data without connecting Google. Use Disconnect or Settings → This device → Clear this device’s data when finished on a shared device.</p>
           <p>A short-lived Google access token and its expiry time, account ID and app identifier are kept in this tab’s session storage so a refresh can restore your connection. It is never written to local storage or an app server. This copy expires at Google’s original expiry time or within one hour, whichever is sooner; refreshing does not extend it. Restoring checks your account and Sheet permissions with Google again. Browser session restoration may preserve tab storage, but expired credentials are discarded.</p>
-          <p>The temporary token is readable by scripts running on this website’s origin. Disconnect or Clear this device’s data removes it. If tab storage is blocked, the app uses memory and refreshing may require reconnecting. Your verified email, full customer list, transaction history and generated PDFs stay in memory. After Google access expires, reconnect to load history and save; you can still edit the remembered draft and generate a PDF.</p>
+          <p>The temporary token is readable by scripts running on this website’s origin. Disconnect or Clear this device’s data removes it. If tab storage is blocked, the app uses memory and refreshing may require reconnecting. Your verified email, full customer list, transaction history and generated PDFs/JPG images stay in memory. After Google access expires, reconnect to load history and save; you can still edit the remembered draft and generate a PDF or JPG.</p>
           <p>Only one working invoice is remembered per browser profile. Starting a new invoice replaces it; when using multiple tabs, the last tab that saves locally wins. Private browsing, clearing browser data or device loss can remove this copy. Save important records to your Google Sheet.</p>
-          <p>PDFs are generated locally in your browser. Copying a message uses your clipboard. Downloading or choosing a sharing action gives the file or message to the destination you select, such as WhatsApp. SheetInvoice does not send messages automatically.</p>
+          <p>PDFs and JPG images are generated locally in your browser. Copying a message uses your clipboard. Downloading or choosing a sharing action gives the file or message to the destination you select, such as WhatsApp. SheetInvoice does not send messages automatically.</p>
 
           <h2>Hosting and third-party services</h2>
           <p>SheetInvoice includes no advertising or app analytics. Google Identity and Picker scripts load from Google, and Google processes sign-in and API requests under its <a href="https://policies.google.com/privacy">privacy policy</a>.</p>
@@ -47,7 +47,7 @@ const canonical = Astro.site ? new URL(`${base}privacy/`, Astro.site).href : nul
 
           <h2>Your controls</h2>
           <ul>
-            <li><strong>Disconnect</strong> or <strong>Clear this device’s data</strong> clears the app’s connection, temporary token, loaded records, current draft, defaults and generated PDF, and removes the remembered draft/defaults and Sheet IDs from local storage. Other open SheetInvoice tabs are also cleared; suspended tabs clear when resumed. Your Google Sheet is unchanged.</li>
+            <li><strong>Disconnect</strong> or <strong>Clear this device’s data</strong> clears the app’s connection, temporary token, loaded records, current draft, defaults and generated files, and removes the remembered draft/defaults and Sheet IDs from local storage. Other open SheetInvoice tabs are also cleared; suspended tabs clear when resumed. Your Google Sheet is unchanged.</li>
             <li>Token expiry keeps your remembered draft and defaults. If the app detects revoked access or unsuitable Sheet sharing, it clears the remembered data. Connecting a different Google account clears the previous account’s working data before loading another workbook.</li>
             <li>You can revoke Google access through <a href="https://myaccount.google.com/connections">Google Account connections</a>. To edit or remove saved records, manage the workbook in Google Sheets or Drive.</li>
             <li>Saved invoices and their revisions contain historical details. Editing a customer or business profile does not erase those earlier snapshots. Disconnecting or revoking access cannot recall downloaded files, copied messages or copies you have shared.</li>

@@ -142,9 +142,9 @@ export function whatsappUrl(invoice) {
   return `https://wa.me/${number}?text=${encodeURIComponent(invoiceSummary(invoice))}`;
 }
 
-export function invoiceFilename(invoice) {
+export function invoiceFilename(invoice, format = 'pdf', page = null) {
   const safe = invoice.number.replace(/[^a-z0-9_-]/gi, "-").replace(/-+/g, "-").slice(0, 70) || "invoice";
-  return `${safe}.pdf`;
+  return `${safe}${page === null ? '' : `-page-${page}`}.${format === 'jpg' ? 'jpg' : 'pdf'}`;
 }
 
 // Only restore the shape we own, with length limits; stored data never becomes HTML.

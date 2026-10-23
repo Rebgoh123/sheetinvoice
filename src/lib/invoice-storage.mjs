@@ -56,7 +56,7 @@ export function loadDevice(storage) {
       typeof item.quantity === 'string' && /^\d{1,3}$/.test(item.quantity) && Number(item.quantity) >= 1 &&
       typeof item.price === 'string' && (item.price === '' || priceInCents(item.price) !== null))
       .map(({ description, quantity, price }) => ({ description, quantity, price })) : [];
-    return { invoice, business: normalizeSeller(saved.business), design: normalizeDesign(saved.design),
+    return { invoice, business: normalizeSeller(saved.business), design: normalizeDesign(saved.design), exportFormat: saved.exportFormat === 'jpg' ? 'jpg' : 'pdf',
       numberStart: typeof saved.numberStart === 'string' ? saved.numberStart.slice(0, 70) : '',
       automaticNumber: typeof saved.automaticNumber === 'string' && saved.automaticNumber === invoice.number ? invoice.number : null,
       savedItems: workbookId ? items : [], accountId, workbookId,

@@ -69,6 +69,8 @@ body { margin:0; }
   .invoice-app .iv-paid-check { display:flex; align-items:center; gap:7px; margin:0; font-size:12px; min-height:44px; white-space:nowrap; }
   .invoice-app input[type=checkbox] { width:16px; height:16px; accent-color:var(--iv-accent); margin:0; }
   .invoice-app .iv-save-actions { display:flex; gap:9px; }
+  .invoice-app .iv-format-choice { margin:0; flex:0 0 68px; }
+  .invoice-app .iv-format-choice select { height:100%; padding-inline:8px; }
   .invoice-app .iv-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:43px; border:1px solid var(--iv-line); border-radius:6px; background:var(--iv-surface); padding:10px 15px; font-size:12px; font-weight:500; white-space:nowrap; }
   .invoice-app .iv-button svg { width:16px; height:16px; }
   .invoice-app .iv-primary { background:var(--iv-accent); color:var(--iv-on-accent); border-color:var(--iv-accent); }
@@ -126,6 +128,7 @@ body { margin:0; }
     .invoice-app .iv-save-actions button { flex:1; }
   }
   @container (max-width:480px) {
+    .invoice-app .iv-save-actions .iv-primary svg { display:none; }
     .invoice-app .iv-header { padding:18px 18px 12px; gap:10px; }
     .invoice-app .iv-brand { font-size:17px; }
     .invoice-app .iv-account { gap:10px; }
@@ -185,6 +188,7 @@ body { margin:0; }
 .invoice-app .pdf-file strong { font-weight:500; font-size:14px; }
 .invoice-app .pdf-file p { color:var(--iv-muted); font-size:12px; margin-top:4px; }
 .invoice-app .pdf-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; }
+.invoice-app .invoice-image-preview { display:block; width:100%; height:auto; margin-top:20px; border:1px solid var(--iv-line); background:white; }
 .invoice-app .summary-area { border-top:1px solid var(--iv-line); padding-top:15px; margin-top:22px; }
 .invoice-app #whatsapp-summary { margin-top:12px; }
 @container (max-width:650px) { .invoice-app .line-total>span { display:block; font-size:11px; margin-bottom:7px; } }

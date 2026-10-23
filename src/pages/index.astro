@@ -15,7 +15,7 @@ const googleConfig = {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#285d60" />
-    <meta name="description" content="Create invoices, save to your private Google Sheet and share a PDF." />
+    <meta name="description" content="Create invoices, save to your private Google Sheet and share a PDF or JPG." />
     <meta name="robots" content="noindex, nofollow" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>{title}</title>
@@ -64,7 +64,7 @@ const googleConfig = {
               <div class="iv-footer">
                 <div class="iv-total"><span>Total</span><strong id="action-total">S$0.00</strong></div>
                 <label class="iv-paid-check"><input id="payment-status" name="paid" type="checkbox" />Mark as paid</label>
-                <div class="iv-save-actions"><button id="save-invoice" class="iv-button" type="submit" name="action" value="save-only" disabled>Save</button><button id="generate-pdf" class="iv-button iv-primary" type="submit" name="action" value="pdf"><span>Generate PDF</span><Icon name="arrow" /></button></div>
+                <div class="iv-save-actions"><label class="iv-format-choice"><span class="sr-only">Invoice format</span><select id="export-format" name="exportFormat"><option value="pdf">PDF</option><option value="jpg">JPG</option></select></label><button id="save-invoice" class="iv-button" type="submit" name="action" value="save-only" disabled>Save</button><button id="generate-pdf" class="iv-button iv-primary" type="submit" name="action" value="export"><span>Generate PDF</span><Icon name="arrow" /></button></div>
               </div>
             </form>
             <p id="invoice-save-status" class="iv-feedback" role="status" hidden></p>
@@ -138,8 +138,10 @@ const googleConfig = {
             <div class="iv-title-row"><h1 id="result-heading" tabindex="-1">Invoice ready</h1><button id="edit-invoice" class="iv-text-button" type="button">Back to invoice</button></div>
             <div class="pdf-file"><Icon name="invoice" /><div><strong id="result-filename"></strong><p id="result-description"></p></div><span id="result-payment-status" class="iv-small-badge"></span></div>
             <p id="sheet-save-status" class="field-help" role="status"></p>
-            <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button"><Icon name="share" /><span>Share PDF</span></button><a id="view-pdf" class="iv-button" target="_blank" rel="noopener">View PDF<Icon name="external" /></a><a id="download-pdf" class="iv-button" download>Download<Icon name="download" /></a></div>
+            <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button"><Icon name="share" /><span>Share PDF</span></button><a id="view-pdf" class="iv-button" target="_blank" rel="noopener"><span>View PDF</span><Icon name="external" /></a><a id="download-pdf" class="iv-button" download><span>Download</span><Icon name="download" /></a></div>
             <p id="share-help" class="field-help"></p><p id="share-status" class="field-help" role="status"></p>
+            <div id="image-page-controls" class="history-pagination" hidden><button id="image-previous" class="iv-text-button" type="button">Previous page</button><span id="image-page" role="status"></span><button id="image-next" class="iv-text-button" type="button">Next page</button></div>
+            <img id="invoice-image" class="invoice-image-preview" alt="Invoice preview" hidden />
             <details class="iv-notes summary-area"><summary>WhatsApp message</summary><label class="sr-only" for="whatsapp-summary">WhatsApp summary</label><textarea id="whatsapp-summary" rows="7" readonly></textarea><div class="summary-actions"><button id="copy-summary" class="iv-text-button" type="button"><Icon name="copy" />Copy message</button><a id="open-whatsapp" class="iv-text-button" target="_blank" rel="noopener noreferrer">Open WhatsApp<Icon name="external" /></a></div></details>
           </section>
         </div>

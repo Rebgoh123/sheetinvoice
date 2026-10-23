@@ -8,7 +8,11 @@ const red = rgb(0.71, 0.19, 0.19);
 const colorChannels = hex => hex.slice(1).match(/../g).map(channel => parseInt(channel, 16) / 255);
 const canvasFonts = 'Arial, "PingFang SC", "Heiti SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
 
-export async function generateInvoicePdf(invoice) {
+export const generateInvoicePdf = invoice => renderInvoice(invoice, false);
+export const generateInvoiceJpg = invoice => renderInvoice(invoice, true);
+
+// Both exports use the same measurements, wrapping and page breaks.
+async function renderInvoice(invoice, asJpg) {
   const errors = validateInvoice(invoice);
   if (errors.length) throw new Error(errors[0]);
   const design = normalizeDesign(invoice.design);
@@ -26,6 +30,7 @@ export async function generateInvoicePdf(invoice) {
   let page, y, bodyTop, bodyBottom;
   const pages = [];
   const encodable = (text, font) => { try { font.encodeText(text); return true; } catch { return false; } };
+  const addPage = () => asJpg ? [] : pdf.addPage([W, H]);
 
   function canvasText(text, size, font) {
     if (typeof document === "undefined") throw new Error("Unicode customer text needs a browser to generate this invoice.");
@@ -43,7 +48,8 @@ export async function generateInvoicePdf(invoice) {
     const measured = width(text, size, font);
     if (align === "right") x -= measured;
     if (align === "center") x -= measured / 2;
-    if (encodable(text, font)) page.drawText(text, { x, y: H - top - size, size, font, color });
+    if (asJpg) page.push({ text, x, top, size, font, color });
+    else if (encodable(text, font)) page.drawText(text, { x, y: H - top - size, size, font, color });
     else {
       const { canvas, context } = canvasText(text, size, font);
       const scale = 3, height = size * 1.65;
@@ -77,7 +83,8 @@ export async function generateInvoicePdf(invoice) {
     return result;
   }
   function rule(x1, top1, x2, top2, thickness = 0.55) {
-    page.drawLine({ start: { x: x1, y: H - top1 }, end: { x: x2, y: H - top2 }, thickness, color: grid });
+    if (asJpg) page.push({ x1, top1, x2, top2, thickness });
+    else page.drawLine({ start: { x: x1, y: H - top1 }, end: { x: x2, y: H - top2 }, thickness, color: grid });
   }
   // Fixed letterhead/footer fields are paragraphs; blank lines must not consume the page.
   const paragraph = text => text.replace(/\s+/g, ' ').trim();
@@ -101,7 +108,7 @@ export async function generateInvoicePdf(invoice) {
     return Math.max(82, top);
   }
   async function firstPage() {
-    page = pdf.addPage([W, H]);
+    page = addPage();
     const top = (await letterhead()) + 16;
     await draw(invoice.status === 'paid' ? 'PAID' : 'UNPAID', 413, top + 2, 10, bold, invoice.status === 'paid' ? rgb(0.12, 0.40, 0.28) : red);
     await draw("INVOICE", COL[5], top, 13, bold, accent, "right");
@@ -125,7 +132,7 @@ export async function generateInvoicePdf(invoice) {
     await table(Math.max(dateTop + 31, messrsTop + Math.max(3, names.length) * 23 + 15));
   }
   async function continuedPage() {
-    page = pdf.addPage([W, H]);
+    page = addPage();
     const titleSize = fit(invoice.seller.name.trim(), 360, 16, serif, 10);
     const titleLines = wrap(invoice.seller.name.trim(), 360, titleSize, serif);
     for (const [index, text] of titleLines.entries()) await aligned(text, M, W - M, 29 + index * (titleSize + 4), titleSize, serif, accent, design.businessAlign);
@@ -191,5 +198,35 @@ export async function generateInvoicePdf(invoice) {
     await draw("All amounts in SGD.", M, H - 24, 7, regular, accent);
     await draw(`${index + 1} / ${pages.length}`, W - M, H - 24, 7, regular, accent, "right");
   }
-  return pdf.save();
+  if (!asJpg) return pdf.save();
+  const canvas = document.createElement('canvas'), context = canvas.getContext('2d', { alpha: false });
+  if (!context) throw new Error('Your browser could not create the invoice image.');
+  const scale = 3, images = [];
+  const cssColor = color => `rgb(${color.red * 255}, ${color.green * 255}, ${color.blue * 255})`;
+  try {
+    // Reuse one A4 canvas instead of holding every page's pixels in phone memory.
+    for (const record of pages) {
+      canvas.width = Math.ceil(W * scale); canvas.height = Math.ceil(H * scale);
+      context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.scale(scale, scale);
+      for (const command of record.page) {
+        if (Object.hasOwn(command, 'text')) {
+          const { text, x, top, size, font, color } = command;
+          const standard = encodable(text, font);
+          const family = font === serif && standard ? '"Times New Roman", Times, serif' : canvasFonts;
+          context.font = `${font === italic && standard ? 'italic ' : ''}${font === bold || font === serif ? '700' : '400'} ${size}px ${family}`;
+          context.fillStyle = cssColor(color);
+          context.textBaseline = standard ? 'alphabetic' : 'top';
+          context.fillText(text, x, standard ? top + size : top);
+        } else {
+          context.strokeStyle = cssColor(grid); context.lineWidth = command.thickness;
+          context.beginPath(); context.moveTo(command.x1, command.top1); context.lineTo(command.x2, command.top2); context.stroke();
+        }
+      }
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.94));
+      if (!blob || blob.type !== 'image/jpeg') throw new Error('Your browser could not create a JPG. Try PDF instead.');
+      images.push(blob);
+    }
+  } finally { canvas.width = canvas.height = 1; }
+  return images;
 }
