@@ -38,6 +38,7 @@ export async function prepareGoogle(config, onToken, onError) {
 
 export async function preparePicker(config) {
   if (!config.apiKey || !/^\d+$/.test(config.appId || '')) throw new SheetsError('Choosing an existing Sheet needs the Google Picker configuration.', 'configuration');
+  if (window.google?.picker) return;
   await script('https://apis.google.com/js/api.js');
   await new Promise((resolve, reject) => window.gapi.load('picker', { callback: resolve, onerror: () => reject(new SheetsError('Google’s Sheet picker could not load.', 'network')), timeout: 15000, ontimeout: () => reject(new SheetsError('Google’s Sheet picker took too long to load.', 'network')) }));
 }

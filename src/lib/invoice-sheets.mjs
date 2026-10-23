@@ -1,4 +1,4 @@
-import { SELLER_FIELDS, normalizeSeller, sellerLimits, normalizeSavedItem, normalizeInvoice, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber, invoiceNumberStartError, messageTemplateFromPrefix } from './invoice.mjs';
+import { SELLER_FIELDS, normalizeSeller, normalizeSavedItem, normalizeInvoice, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber, invoiceNumberStartError, messageTemplateFromPrefix } from './invoice.mjs';
 import { DESIGN_SETTINGS, normalizeDesign, validateDesign } from './invoice-design.mjs';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -63,15 +63,13 @@ export function parseWorkbook(metadata, ranges) {
   const numberStart = String(settings[NUMBER_START] ?? '').trim();
   if (!supportedVersions.has(settings.schema)) throw new SheetsError('This workbook uses an unsupported invoice format.', 'schema');
   // Read older JSON profiles, with readable Settings rows taking precedence when present.
-  let seller;
-  try { seller = normalizeSeller(JSON.parse(settings.seller)); } catch { seller = normalizeSeller(); }
+  const seller = { ...safeJson(settings.seller) };
   for (const [key, label] of Object.entries(businessKeys)) {
-    if (Object.hasOwn(settings, label)) seller[key] = String(settings[label] ?? '').slice(0, sellerLimits[key]);
+    if (Object.hasOwn(settings, label)) seller[key] = String(settings[label] ?? '');
   }
   if (!Object.hasOwn(settings, businessKeys.messageTemplate) && Object.hasOwn(settings, 'WhatsApp message prefix')) {
     seller.messageTemplate = messageTemplateFromPrefix(String(settings['WhatsApp message prefix'] ?? ''));
   }
-  seller = normalizeSeller(seller);
   let optionalIndex = Object.keys(TABLES).length;
   const optional = Object.fromEntries(Object.keys(optionalTables).filter(title => Number.isInteger(tabs[title])).map(title => [title, ranges[optionalIndex++]?.values || []]));
   const catalog = parseSavedItems(optional[SAVED_ITEMS_TAB]);
@@ -93,7 +91,7 @@ export function parseWorkbook(metadata, ranges) {
     if (!uuidPattern.test(values[0] || '') || typeof values[1] !== 'string' || !values[1].trim()) continue;
     customers.set(values[0], { id: values[0], name: values[1].slice(0, 120), phone: String(values[2] || '').slice(0, 40), address: String(values[3] || '').slice(0, 400) });
   }
-  return { id: metadata.spreadsheetId, name: metadata.properties.title, tabs, tables, seller, numberStart, numberingWarning: invoiceNumberStartError(numberStart), design: design.value, designWarning: design.warning, savedItems: catalog.items, savedItemsWarning: catalog.warning,
+  return { id: metadata.spreadsheetId, name: metadata.properties.title, tabs, tables, seller: normalizeSeller(seller), numberStart, numberingWarning: invoiceNumberStartError(numberStart), design: design.value, designWarning: design.warning, savedItems: catalog.items, savedItemsWarning: catalog.warning,
     customers: [...customers.values()].sort((a, b) => a.name.localeCompare(b.name)),
     invoices: [...latest.values()].filter(record => !record.deleted).reverse(),
     deletedInvoices: [...latest.values()].filter(record => record.deleted) };

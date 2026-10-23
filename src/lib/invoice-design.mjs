@@ -5,7 +5,6 @@ export const DESIGN_SETTINGS = {
   itemAlign: { label: 'Item text alignment', value: 'left', options: 'left, center or right. Descriptions, service address, payment and notes.' },
   footerAlign: { label: 'Footer alignment', value: 'left', options: 'left, center or right. Invoice footer text.' },
 };
-export const defaultDesign = Object.fromEntries(Object.entries(DESIGN_SETTINGS).map(([key, setting]) => [key, setting.value]));
 
 function readableColor(value) {
   if (!/^#[0-9a-f]{6}$/i.test(value)) return false;
@@ -20,9 +19,9 @@ function validValue(key, value) {
   return key.endsWith('Color') ? readableColor(value) : ['left', 'center', 'right'].includes(value);
 }
 export function normalizeDesign(source) {
-  return Object.fromEntries(Object.entries(defaultDesign).map(([key, fallback]) => {
+  return Object.fromEntries(Object.entries(DESIGN_SETTINGS).map(([key, setting]) => {
     const value = typeof source?.[key] === 'string' ? source[key].trim().toLowerCase() : '';
-    return [key, validValue(key, value) ? (key.endsWith('Color') ? value.toUpperCase() : value) : fallback];
+    return [key, validValue(key, value) ? (key.endsWith('Color') ? value.toUpperCase() : value) : setting.value];
   }));
 }
 export function validateDesign(source) {

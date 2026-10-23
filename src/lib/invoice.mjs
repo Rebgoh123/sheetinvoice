@@ -19,8 +19,6 @@ export const SELLER_FIELDS = {
   messageTemplate: { label: 'WhatsApp message template (optional)', sheetKey: 'WhatsApp message template', id: 'seller-message-template', limit: 3000, printed: false },
   reviewUrl: { label: 'Review link (optional)', sheetKey: 'Review link', id: 'seller-review-url', limit: 1000, printed: false },
 };
-export const defaultSeller = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.default ?? '']));
-export const sellerLimits = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.limit]));
 export function messageTemplateFromPrefix(value) {
   const prefix = typeof value === 'string' ? value.slice(0, 1000).trim() : '';
   return prefix ? `${prefix.replace(/[{}]/g, brace => brace + brace)}\n\n{invoice_summary}` : '';
@@ -35,8 +33,7 @@ export function normalizeSeller(source) {
   }));
 }
 export function sameSeller(left, right, { printedOnly = false } = {}) {
-  const a = normalizeSeller(left), b = normalizeSeller(right);
-  return Object.entries(SELLER_FIELDS).every(([key, field]) => (printedOnly && field.printed === false) || a[key] === b[key]);
+  return Object.entries(SELLER_FIELDS).every(([key, field]) => (printedOnly && field.printed === false) || left[key] === right[key]);
 }
 export function sellerHeaderLines(source) {
   const seller = normalizeSeller(source);
@@ -51,8 +48,8 @@ export function sellerHeaderLines(source) {
 export function validateSeller(seller) {
   const errors = [];
   if (typeof seller?.name !== 'string' || !seller.name.trim()) errors.push('Enter your business name in Settings.');
-  for (const [key, limit] of Object.entries(sellerLimits)) {
-    if (typeof seller?.[key] !== 'string' || seller[key].length > limit) errors.push(`${SELLER_FIELDS[key].label} is too long or invalid.`);
+  for (const [key, field] of Object.entries(SELLER_FIELDS)) {
+    if (typeof seller?.[key] !== 'string' || seller[key].length > field.limit) errors.push(`${field.label} is too long or invalid.`);
   }
   if (seller?.signatureImage && !normalizeSignatureImage(seller.signatureImage)) errors.push('Upload a valid signature image in Settings.');
   if (seller?.reviewUrl?.trim()) {
@@ -69,7 +66,7 @@ const displayDateFormatter = new Intl.DateTimeFormat('en-SG', { day: 'numeric', 
 const moneyFormatter = new Intl.NumberFormat('en-SG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const singaporeDate = (now = new Date()) => singaporeDateFormatter.format(now);
 
-export function newInvoice(seller = defaultSeller, now = new Date(), design) {
+export function newInvoice(seller, now = new Date(), design) {
   const suffix = globalThis.crypto.randomUUID().slice(0, 6).toUpperCase();
   return {
     number: `${singaporeDate(now).replaceAll("-", "").slice(2)}-${suffix}`,
@@ -199,14 +196,11 @@ export const WHATSAPP_FIELDS = {
 export function invoiceSummary(invoice) {
   const template = invoice.seller.messageTemplate?.trim();
   if (!template) return standardInvoiceSummary(invoice);
-  const values = new Map();
   // Replace once, so braces in customer names or other values stay literal.
   return template.replace(/\{\{|\}\}|\{([a-z_]+)\}/g, (match, key) => {
     if (match === '{{') return '{';
     if (match === '}}') return '}';
-    if (!Object.hasOwn(WHATSAPP_FIELDS, key)) return match;
-    if (!values.has(key)) values.set(key, WHATSAPP_FIELDS[key].value(invoice));
-    return values.get(key);
+    return Object.hasOwn(WHATSAPP_FIELDS, key) ? WHATSAPP_FIELDS[key].value(invoice) : match;
   });
 }
 

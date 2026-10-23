@@ -24,9 +24,9 @@ let cachedItems = remembered?.savedItems || [], cachedDesign = remembered?.desig
 let generated = null, objectUrls = [], previewUrls = [], exportPage = 0, revision = 0, generating = false, sharing = false;
 let exportFormat = remembered?.exportFormat || 'pdf';
 $('export-format').value = exportFormat;
-let sheets = null, workbook = null, googleUser = null, tokenClient = null, googleBusy = false, pickerReady = false, googleLoadFailed = false;
+let sheets = null, workbook = null, googleUser = null, tokenClient = null, googleBusy = false, googleLoadFailed = false;
 let restoringSession = false;
-let connectionEpoch = 0, loginEpoch = null, expiryTimer = null, requiresSheetSave = !!remembered?.workbookId, dirty = remembered?.dirty || false;
+let connectionEpoch = 0, loginEpoch = null, expiryTimer = null, dirty = remembered?.dirty || false;
 let checkingAccess = false;
 let recordId = remembered?.recordId || crypto.randomUUID(), recordRevision = remembered?.recordRevision || crypto.randomUUID(), customerId = remembered?.customerId || null, recordWorkbookId = remembered?.workbookId || null;
 let baseRevision = remembered?.baseRevision || null, historyPage = 0, historyCount = 0;
@@ -37,7 +37,6 @@ let editReturnRecord = null, resetUndo = null, pendingEdit = null;
 const googleConfig = JSON.parse($('invoice-google-config').textContent);
 const exportLabel = () => `${workbook ? 'Save &' : 'Generate'} ${exportFormat.toUpperCase()}`;
 const savedItems = () => workbook?.savedItems ?? cachedItems;
-const sheetDesign = () => workbook?.design ?? cachedDesign;
 
 const customerFields = ['name', 'phone', 'address'];
 function fillBusinessForm() {
@@ -75,7 +74,6 @@ function applyNumbering(next) {
     revision++; recordRevision = crypto.randomUUID(); discardExport();
   } catch (error) { updateNumberingWarning(error.message); }
 }
-function resetBusinessProfile() { business = normalizeSeller(); numberStart = ''; profileDirty = false; fillBusinessForm(); }
 function businessChanged(event) {
   if (event.target.id === 'signature-upload') return;
   $('message-field-status').textContent = '';
@@ -245,7 +243,7 @@ async function refreshBusiness() {
   if (epoch !== connectionEpoch || sheets !== active) throw new Error('Google connection changed. Try again.');
   useWorkbook(next, { businessOnly: true });
 }
-const currentBusinessInvoice = snapshot => ({ ...structuredClone(snapshot), seller: normalizeSeller(business) });
+const currentBusinessInvoice = snapshot => ({ ...structuredClone(snapshot), seller: { ...business } });
 async function renderCurrentExport(source, epoch, format = source.format) {
   if (epoch !== connectionEpoch || generated !== source) return false;
   const snapshot = currentBusinessInvoice(source.invoice), profileChanged = !sameSeller(snapshot.seller, source.invoice.seller);
@@ -260,14 +258,8 @@ async function renderCurrentExport(source, epoch, format = source.format) {
 }
 async function finishSettings() {
   if (generating || signatureBusy || googleBusy) return;
-  if (previousView !== 'pdf' || !generated) { showView(previousView); return; }
-  const source = generated, epoch = connectionEpoch;
-  generating = true; updateCloudControls();
-  try {
-    await refreshBusiness();
-    if (await renderCurrentExport(source, epoch)) showView('pdf');
-  } catch (error) { if (epoch === connectionEpoch) cloudError(error); }
-  finally { generating = false; updateCloudControls(); persist(); }
+  if (previousView !== 'pdf' || !generated) showView(previousView);
+  else if (await refreshExport()) showView('pdf');
 }
 function changed(event) {
   if (['export-format', 'saved-customer'].includes(event?.target?.id)) return;
@@ -346,10 +338,6 @@ function renderSavedItems() {
   $('saved-items-status').textContent = workbook ? `${items.length} saved item${items.length === 1 ? '' : 's'} available.` : '';
   updateSavedItemControl();
 }
-function renderDesign() {
-  renderOptionalTab(DESIGN_TAB, 'design', 'design-settings', workbook?.designWarning);
-  $('design-status').textContent = '';
-}
 
 form.addEventListener("input", changed);
 $('business-form').addEventListener('input', businessChanged);
@@ -407,34 +395,30 @@ async function completeInvoice({ exportFile = true } = {}) {
   $('google-error').hidden = true;
   if (!exportFile && !workbook) return;
   readForm(); errors();
-  const epoch = connectionEpoch;
+  const epoch = connectionEpoch, format = exportFormat, formatLabel = format.toUpperCase(), button = $('generate-pdf');
+  let snapshot;
   generating = true; updateCloudControls();
-  try { await refreshBusiness(); }
-  catch (error) { if (epoch === connectionEpoch) cloudError(error); return; }
-  finally { generating = false; updateCloudControls(); }
-  if (epoch !== connectionEpoch) return;
-  if (!sameSeller(invoice.seller, business)) {
-    invoice.seller = normalizeSeller(business); revision++; recordRevision = crypto.randomUUID(); dirty = true;
-  }
-  if (!invoice.seller.name.trim()) {
-    showView('settings'); $('business-defaults').open = true;
-    $('business-save-status').textContent = 'Enter your business name for this invoice.';
-    $('seller-name').focus(); return;
-  }
-  const validation = validateInvoice(invoice);
-  if (validation.length) { errors(validation); return; }
-  generating = true;
-  updateCloudControls();
-  const format = exportFormat, formatLabel = format.toUpperCase();
-  const button = $("generate-pdf"); button.disabled = true; button.querySelector("span").textContent = exportFile ? `Creating ${formatLabel}…` : "Saving…";
-  const version = revision, snapshot = structuredClone(invoice), saveRecord = { id: recordId, revision: recordRevision, baseRevision, customerId, invoice: snapshot };
-  const activeSheets = sheets, activeWorkbook = workbook;
-  discardExport();
   try {
+    await refreshBusiness();
+    if (epoch !== connectionEpoch) return;
+    if (!sameSeller(invoice.seller, business)) {
+      invoice.seller = { ...business }; revision++; recordRevision = crypto.randomUUID(); dirty = true;
+    }
+    if (!invoice.seller.name.trim()) {
+      showView('settings'); $('business-defaults').open = true;
+      $('business-save-status').textContent = 'Enter your business name for this invoice.';
+      $('seller-name').focus(); return;
+    }
+    const validation = validateInvoice(invoice);
+    if (validation.length) { errors(validation); return; }
+    const version = revision;
+    snapshot = structuredClone(invoice);
+    const saveRecord = { id: recordId, revision: recordRevision, baseRevision, customerId, invoice: snapshot };
+    discardExport();
     let savedToSheet = false;
-    if (activeSheets && activeWorkbook) {
+    if (sheets && workbook) {
       button.querySelector('span').textContent = 'Saving…';
-      const saved = await activeSheets.save(activeWorkbook.id, saveRecord);
+      const saved = await sheets.save(workbook.id, saveRecord);
       if (epoch !== connectionEpoch) return;
       workbook = saved.workbook; savedToSheet = true;
       if (recordId === saveRecord.id) baseRevision = saveRecord.revision;
@@ -445,7 +429,7 @@ async function completeInvoice({ exportFile = true } = {}) {
       $('invoice-save-status').hidden = false;
       if (version !== revision) { $('invoice-save-status').textContent = 'Earlier details saved. Your latest changes still need saving.'; return; }
       $('invoice-save-status').textContent = `Saved to Sheet · ${snapshot.status === 'paid' ? 'Paid' : 'Unpaid'}`;
-      persist(); return;
+      return;
     }
     button.querySelector('span').textContent = `Creating ${formatLabel}…`;
     const output = await invoiceFiles(snapshot, format);
@@ -453,13 +437,12 @@ async function completeInvoice({ exportFile = true } = {}) {
     if (version !== revision) { errors([savedToSheet ? `Earlier details saved. Choose Save & ${formatLabel} again for your latest edits.` : `The details changed. Generate the ${formatLabel} again.`]); return; }
     displayExport({ ...output, format, invoice: snapshot, savedToSheet });
     showView('pdf');
-    persist();
   } catch (error) {
     if (epoch !== connectionEpoch) return;
-    if (error.name === 'SheetsError') cloudError(error);
+    if (error.name === 'SheetsError' || !snapshot) cloudError(error);
     else errors([`The ${formatLabel} could not be created. Your draft is still here. If the Sheet save completed, it remains in invoice history. Please try again.`]);
   } finally {
-    generating = false; button.disabled = false; button.querySelector("span").textContent = exportLabel(); updateCloudControls(); persist();
+    generating = false; updateCloudControls(); persist();
   }
 }
 form.addEventListener('submit', event => {
@@ -473,9 +456,11 @@ $('export-format').addEventListener('change', () => {
 for (const [id, direction] of [['image-previous', -1], ['image-next', 1]]) $(id).addEventListener('click', () => showExportPage(exportPage + direction));
 $('result-back').addEventListener('click', () => showView(generated?.record ? 'history' : 'invoice'));
 $('edit-invoice').addEventListener('click', () => { if (generated?.record) editRecord(generated.record, { returnToPreview: true }); });
-document.querySelectorAll('[data-export-format]').forEach(button => button.addEventListener('click', () => changeExportFormat(button.dataset.exportFormat)));
-async function changeExportFormat(format) {
-  if (!generated || generated.format === format || generating || sharing || googleBusy) return;
+document.querySelectorAll('[data-export-format]').forEach(button => button.addEventListener('click', () => {
+  if (generated?.format !== button.dataset.exportFormat) refreshExport(button.dataset.exportFormat);
+}));
+async function refreshExport(format = generated?.format) {
+  if (!generated || generating || sharing || googleBusy || signatureBusy) return;
   const source = generated, epoch = connectionEpoch;
   generating = true; updateCloudControls(); $('result-error').hidden = true;
   $('result-format-status').textContent = `Creating ${format.toUpperCase()}…`;
@@ -484,9 +469,10 @@ async function changeExportFormat(format) {
     await refreshBusiness();
     if (!await renderCurrentExport(source, epoch, format)) return;
     exportFormat = format; $('export-format').value = format;
+    return true;
   } catch (error) {
     if (epoch !== connectionEpoch || generated !== source) return;
-    if (error.name === 'SheetsError') { cloudError(error); return; }
+    if (error.name === 'SheetsError' || activeView === 'settings') { cloudError(error); return; }
     $('result-error').textContent = `The ${format.toUpperCase()} could not be created. Your ${source.format.toUpperCase()} is still available. Try again.`;
     $('result-error').hidden = false;
   } finally {
@@ -555,7 +541,7 @@ function startInvoice(selectedCustomer, { offerUndo = true, navigate = true, foc
   resetUndo = offerUndo ? (dirty || baseRevision || (generated && !generated.record) ? structuredClone({ invoice, automaticNumber, recordId, recordRevision, baseRevision, customerId, dirty, recordWorkbookId, editReturnRecord }) : resetUndo) : null;
   editReturnRecord = null;
   $('history-feedback').textContent = ''; $('history-feedback').hidden = true;
-  revision++; recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); customerId = null; dirty = false; $('saved-customer').value = ''; discardExport(); errors(); invoice = newInvoice(business, undefined, sheetDesign());
+  revision++; recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); customerId = null; dirty = false; $('saved-customer').value = ''; discardExport(); errors(); invoice = newInvoice(business, undefined, workbook?.design ?? cachedDesign);
   if (number) invoice.number = number;
   automaticNumber = invoice.number; fillForm(); persist(); updateCloudControls();
   if (selectedCustomer) {
@@ -568,7 +554,7 @@ $('new-invoice').addEventListener('click', () => startInvoice(undefined, { focus
 $('undo-reset').addEventListener('click', () => {
   if (!resetUndo || googleBusy || generating) return;
   ({ invoice, automaticNumber, recordId, recordRevision, baseRevision, customerId, dirty, recordWorkbookId, editReturnRecord } = resetUndo);
-  resetUndo = null; invoice.seller = normalizeSeller(business); revision++;
+  resetUndo = null; invoice.seller = { ...business }; revision++;
   discardExport(); errors(); fillForm(); renderCloudRecords(); persist(); showView('invoice');
 });
 $('close-edit').addEventListener('click', async () => {
@@ -585,14 +571,12 @@ $("clear-device").addEventListener("click", () => {
   disconnectAndClear(); showView('invoice');
 });
 window.addEventListener("pagehide", () => { readForm(); persist(); clearExportUrls(); });
-window.addEventListener("pageshow", (event) => { if (event.persisted && generated) {
-  createExportUrls(); showExportPage(exportPage);
-} });
 window.addEventListener('storage', event => {
   if (event.key === FORGET_KEY || event.key === null) { forgetMarker = stored(FORGET_KEY); disconnectAndClear(false); }
 });
-window.addEventListener('pageshow', () => {
+window.addEventListener('pageshow', event => {
   if (stored(FORGET_KEY) !== forgetMarker) disconnectAndClear(false);
+  if (event.persisted && generated) { createExportUrls(); showExportPage(exportPage); }
 });
 fillBusinessForm(); fillForm(); renderSavedItems(); $("invoice-app").hidden = false; persist();
 
@@ -600,17 +584,22 @@ function resetWorkingData() {
   editReturnRecord = null; resetUndo = null;
   exportFormat = 'pdf'; $('export-format').value = exportFormat;
   cachedItems = []; cachedDesign = normalizeDesign(); cacheAccountId = null; recordWorkbookId = null;
-  resetBusinessProfile(); invoice = newInvoice(); dirty = false; customerId = null;
+  business = normalizeSeller(); numberStart = ''; profileDirty = false; fillBusinessForm();
+  invoice = newInvoice(); dirty = false; customerId = null;
   automaticNumber = invoice.number;
   recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); revision++; discardExport(); fillForm();
 }
-function disconnectAndClear(broadcast = true) {
-  connectionEpoch++; clearTimeout(expiryTimer); sheets?.disconnect(); sheets = null; workbook = null; googleUser = null; requiresSheetSave = false; googleBusy = false; restoringSession = false;
-  const cleared = forgetDevice(undefined, broadcast); forgetMarker = stored(FORGET_KEY); resetWorkingData();
-  $('sheet-setup').hidden = true; $('sheet-connected').hidden = true; $('existing-sheet').replaceChildren(new Option('Choose a workbook', ''));
+function disconnectGoogle() {
+  connectionEpoch++; clearTimeout(expiryTimer); sheets?.disconnect(); sheets = null; workbook = null; googleBusy = false; restoringSession = false;
+  clearGoogleSession(); $('google-session-status').hidden = true;
+  $('sheet-setup').hidden = true; $('sheet-connected').hidden = true;
   $('open-sheet').removeAttribute('href'); $('connected-sheet-name').textContent = ''; $('business-save-status').textContent = '';
+}
+function disconnectAndClear(broadcast = true) {
+  disconnectGoogle(); googleUser = null;
+  const cleared = forgetDevice(undefined, broadcast); forgetMarker = stored(FORGET_KEY); resetWorkingData();
+  $('existing-sheet').replaceChildren(new Option('Choose a workbook', ''));
   $('google-error').hidden = true; $('google-status').textContent = 'Disconnected. Remembered data has been cleared from this device. Your Sheet is unchanged.';
-  $('google-session-status').hidden = true;
   renderCloudRecords(); persist();
   if (!cleared) $('device-storage-status').textContent = 'This browser could not clear remembered data. Clear this site’s storage in your browser settings.';
 }
@@ -623,7 +612,7 @@ function updateCloudControls() {
   $('connect-google').hidden = !!sheets;
   $('disconnect-google').disabled = (!sheets && !googleUser) || cloudBusy;
   $('change-sheet').disabled = !workbook || cloudBusy;
-  const connectLabel = restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : requiresSheetSave ? 'Reconnect' : 'Connect Google Sheet';
+  const connectLabel = restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : recordWorkbookId ? 'Reconnect' : 'Connect Google Sheet';
   $('connect-google').textContent = connectLabel;
   for (const button of document.querySelectorAll('[data-connect-sheet]')) {
     button.disabled = $('connect-google').disabled;
@@ -655,25 +644,22 @@ function updateCloudControls() {
   $('history-previous').disabled = cloudBusy || historyPage === 0;
   $('history-next').disabled = cloudBusy || historyPage >= Math.ceil(historyCount / 10) - 1;
   for (const control of [$('new-invoice'), $('history-new-invoice'), $('clear-device'), $('saved-customer'), ...document.querySelectorAll('[data-customer-mode]')]) control.disabled = draftBusy;
-  $('connection-label').textContent = workbook ? 'Sheet connected' : restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : sheets ? 'Choose a Sheet' : requiresSheetSave ? 'Reconnect Sheet' : 'Not connected';
+  $('connection-label').textContent = workbook ? 'Sheet connected' : restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : sheets ? 'Choose a Sheet' : recordWorkbookId ? 'Reconnect Sheet' : 'Not connected';
   $('connection-status').dataset.connected = String(!!workbook);
   $('connect-hint').hidden = !!workbook;
   $('history-connect').hidden = !!workbook;
-  $('connect-hint-text').textContent = requiresSheetSave ? 'Reconnect to the same Sheet. Your draft stays here.' : 'Keep your invoices in your own Sheet.';
-  $('history-connect-text').textContent = requiresSheetSave ? 'Reconnect to load transactions from the same Sheet.' : 'Connect your Sheet to view transactions.';
+  $('connect-hint-text').textContent = recordWorkbookId ? 'Reconnect to the same Sheet. Your draft stays here.' : 'Keep your invoices in your own Sheet.';
+  $('history-connect-text').textContent = recordWorkbookId ? 'Reconnect to load transactions from the same Sheet.' : 'Connect your Sheet to view transactions.';
 }
 function cloudError(error, { quiet = false, focus = true } = {}) {
   $('google-error').textContent = error.message || 'Google could not finish this action. Your draft is still here.';
   $('google-error').hidden = quiet;
   if (['expired', 'permission', 'privacy'].includes(error.code) && sheets) {
-    clearGoogleSession(); $('google-session-status').hidden = true;
     const expired = error.code === 'expired';
-    sheets.disconnect(); sheets = null; workbook = null; connectionEpoch++; clearTimeout(expiryTimer);
-    googleBusy = false; restoringSession = false;
+    disconnectGoogle();
     if (generated?.record) discardExport();
-    if (!expired) { forgetDevice(); forgetMarker = stored(FORGET_KEY); googleUser = null; requiresSheetSave = false; resetWorkingData(); }
-    renderCloudRecords(); $('sheet-setup').hidden = true; $('sheet-connected').hidden = true;
-    $('open-sheet').removeAttribute('href'); $('connected-sheet-name').textContent = ''; $('business-save-status').textContent = '';
+    if (!expired) { forgetDevice(); forgetMarker = stored(FORGET_KEY); googleUser = null; resetWorkingData(); }
+    renderCloudRecords();
     $('google-status').textContent = expired ? 'Tap Reconnect to reopen the same Sheet. Your draft is remembered on this device.' : 'Sheet access is unavailable. Remembered data has been cleared. Connect again after checking sharing settings.';
   }
   updateCloudControls(); persist();
@@ -704,19 +690,19 @@ function renderCloudRecords() {
     $('history-feedback').textContent = ''; $('history-feedback').hidden = true;
   }
   $('undo-delete').hidden = !lastDeleted || lastDeleted.workbookId !== workbook?.id;
-  updateCustomerControls(); renderHistory(); renderSavedItems(); renderDesign();
+  updateCustomerControls(); renderHistory(); renderSavedItems();
+  renderOptionalTab(DESIGN_TAB, 'design', 'design-settings', workbook?.designWarning);
+  $('design-status').textContent = '';
   $('history-count').textContent = workbook ? String(workbook.invoices.length) : '';
   $('history-count').hidden = !workbook;
   $('save-business-defaults').hidden = !workbook;
   updateCloudControls();
 }
-function filteredHistory() {
-  const customer = $('history-customer').value;
-  return (workbook?.invoices || []).filter(record => (!customer || record.customerId === customer)
-    && (historyStatus === 'all' || (record.invoice.status || 'unpaid') === historyStatus));
-}
 function renderHistory() {
-  const records = filteredHistory(), list = $('history-list'); list.replaceChildren(); historyCount = records.length;
+  const customer = $('history-customer').value, list = $('history-list');
+  const records = (workbook?.invoices || []).filter(record => (!customer || record.customerId === customer)
+    && (historyStatus === 'all' || record.invoice.status === historyStatus));
+  list.replaceChildren(); historyCount = records.length;
   historyPage = Math.min(historyPage, Math.max(0, Math.ceil(records.length / 10) - 1));
   $('history-empty').hidden = !workbook || records.length > 0;
   $('history-empty').textContent = workbook?.invoices.length ? 'No transactions for this selection.' : 'No saved invoices yet.';
@@ -727,32 +713,34 @@ function renderHistory() {
   document.querySelectorAll('[data-status]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.status === historyStatus)));
   for (const record of records.slice(historyPage * 10, historyPage * 10 + 10)) {
     const saved = record.invoice, paid = saved.status === 'paid';
-    const row = $('history-row-template').content.firstElementChild.cloneNode(true);
+    const row = $('history-row-template').content.firstElementChild.cloneNode(true); row.dataset.recordId = record.id;
     for (const [field, value] of Object.entries({ number: saved.number, date: displayDate(saved.date), customer: saved.customer.name,
       service: saved.items.map(item => item.description).join(', '), amount: formatMoney(invoiceTotal(saved)) })) row.querySelector(`[data-field="${field}"]`).textContent = value;
     const badge = row.querySelector('[data-field="status"]');
     badge.className = `iv-small-badge iv-badge-${paid ? 'paid' : 'unpaid'}`; badge.textContent = paid ? 'Paid' : 'Unpaid';
-    const open = row.querySelector('[data-action="open"]');
-    open.setAttribute('aria-label', `Open invoice ${saved.number} for ${saved.customer.name}`);
-    open.addEventListener('click', () => openRecord(record));
-    const edit = row.querySelector('[data-action="edit"]'), remove = row.querySelector('[data-action="delete"]');
-    for (const [button, action] of [[edit, 'Edit'], [remove, 'Delete']]) {
-      button.title = `${action} invoice ${saved.number}`; button.setAttribute('aria-label', button.title);
+    for (const [action, label] of [['open', 'Open'], ['edit', 'Edit'], ['pay', 'Mark paid:'], ['delete', 'Delete']]) {
+      const button = row.querySelector(`[data-action="${action}"]`);
+      button.title = `${label} invoice ${saved.number} for ${saved.customer.name}`; button.setAttribute('aria-label', button.title);
     }
-    edit.addEventListener('click', () => openRecord(record, { edit: true }));
-    const pay = row.querySelector('[data-action="pay"]'); pay.hidden = paid;
-    pay.setAttribute('aria-label', `Mark invoice ${saved.number} paid`);
-    pay.addEventListener('click', () => markRecordPaid(record));
-    remove.addEventListener('click', () => {
-      pendingDeletion = { record: structuredClone(record), workbookId: workbook.id };
-      $('delete-transaction-description').textContent = `Delete invoice ${saved.number} for ${saved.customer.name} (${formatMoney(invoiceTotal(saved))}) from your transactions? Customer details stay saved. You can undo this deletion here.`;
-      $('delete-transaction').showModal();
-    });
+    row.querySelector('[data-action="pay"]').hidden = paid;
     list.append(row);
   }
   $('history-pagination').hidden = records.length <= 10;
   $('history-page').textContent = records.length ? `${historyPage * 10 + 1}–${Math.min((historyPage + 1) * 10, records.length)} of ${records.length}` : '';
 }
+$('history-list').addEventListener('click', event => {
+  const button = event.target.closest('button[data-action]');
+  if (!button || googleBusy || generating || sharing) return;
+  const record = workbook?.invoices.find(record => record.id === button.closest('[data-record-id]').dataset.recordId);
+  if (!record) return;
+  if (button.dataset.action === 'open') return openRecord(record);
+  if (button.dataset.action === 'edit') return openRecord(record, { edit: true });
+  if (button.dataset.action === 'pay') return markRecordPaid(record);
+  if (button.dataset.action !== 'delete') return;
+  pendingDeletion = { record, workbookId: workbook.id };
+  $('delete-transaction-description').textContent = `Delete invoice ${record.invoice.number} for ${record.invoice.customer.name} (${formatMoney(invoiceTotal(record.invoice))}) from your transactions? Customer details stay saved. You can undo this deletion here.`;
+  $('delete-transaction').showModal();
+});
 async function openRecord(record, { edit = false } = {}) {
   if (googleBusy || generating || sharing) return;
   const epoch = connectionEpoch, format = exportFormat, returnView = activeView;
@@ -768,7 +756,7 @@ async function openRecord(record, { edit = false } = {}) {
     const snapshot = currentBusinessInvoice(record.invoice);
     const output = await invoiceFiles(snapshot, format);
     if (epoch !== connectionEpoch || activeView !== returnView) return;
-    displayExport({ ...output, format, invoice: snapshot, record: structuredClone(record), savedToSheet: true });
+    displayExport({ ...output, format, invoice: snapshot, record, savedToSheet: true });
     showView('pdf');
   } catch (error) {
     if (epoch !== connectionEpoch) return;
@@ -781,16 +769,16 @@ function editRecord(record, { returnToPreview = false, replaceDraft = false } = 
   if (googleBusy || generating || sharing) return false;
   // Reopening the same edit resumes its local draft instead of replacing it with the Sheet copy.
   if (recordId === record.id && baseRevision === record.revision) {
-    editReturnRecord = returnToPreview ? structuredClone(record) : null;
+    editReturnRecord = returnToPreview ? record : null;
     showView('invoice'); return true;
   }
   if (dirty && !replaceDraft) {
-    pendingEdit = { record: structuredClone(record), returnToPreview, workbookId: workbook?.id };
+    pendingEdit = { record, returnToPreview, workbookId: workbook?.id };
     $('replace-draft-description').textContent = `You have unsaved edits on this device. Editing invoice ${record.invoice.number} will replace them. Save your current invoice first if you want to keep it.`;
     $('replace-draft').showModal(); return false;
   }
-  editReturnRecord = returnToPreview ? structuredClone(record) : null; resetUndo = null;
-  invoice = currentBusinessInvoice(record.invoice); automaticNumber = null; invoice.status ||= 'unpaid'; recordId = record.id; recordRevision = record.revision; baseRevision = record.revision; customerId = record.customerId; dirty = false; revision++; discardExport(); errors(); fillForm(); renderCloudRecords(); persist(); showView('invoice');
+  editReturnRecord = returnToPreview ? record : null; resetUndo = null;
+  invoice = currentBusinessInvoice(record.invoice); automaticNumber = null; recordId = record.id; recordRevision = record.revision; baseRevision = record.revision; customerId = record.customerId; dirty = false; revision++; discardExport(); errors(); fillForm(); renderCloudRecords(); persist(); showView('invoice');
   return true;
 }
 $('cancel-edit').addEventListener('click', () => $('replace-draft').close());
@@ -860,7 +848,7 @@ function useWorkbook(next, { businessOnly = false, render = true } = {}) {
   if (!workbook || workbook.id !== next.id) { revision++; discardExport(); }
   const changedWorkbook = recordWorkbookId !== next.id;
   recordWorkbookId = next.id;
-  workbook = next; cachedItems = next.savedItems; cachedDesign = normalizeDesign(next.design); requiresSheetSave = true;
+  workbook = next;
   if (!profileDirty || changedWorkbook) { business = normalizeSeller(next.seller); numberStart = next.numberStart; profileDirty = false; fillBusinessForm(); }
   if (next.numberingWarning) {
     updateNumberingWarning(next.numberingWarning); $('business-defaults').open = true; $('invoice-number-start').closest('details').open = true;
@@ -877,7 +865,6 @@ function useWorkbook(next, { businessOnly = false, render = true } = {}) {
   $('connected-sheet-name').textContent = next.name;
   $('open-sheet').href = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(next.id)}/edit`;
   $('google-status').textContent = googleUser.email;
-  try { localStorage.setItem(`sheetinvoice-sheet-${googleUser.id}`, next.id); } catch { /* Remembering a Sheet ID is optional. */ }
   if (render) renderCloudRecords();
   else updateCloudControls();
   $('generate-pdf').querySelector('span').textContent = exportLabel(); persist();
@@ -910,14 +897,14 @@ async function connected(token, restoring = false, interactive = false) {
     if (epoch !== connectionEpoch) return;
     const reconnecting = !!recordWorkbookId && nextUser.id === cacheAccountId;
     if (restoring && (nextUser.id !== token.accountId || (cacheAccountId && cacheAccountId !== nextUser.id))) {
-      clearGoogleSession(); active.disconnect(); sheets = null; workbook = null; googleUser = null; renderCloudRecords();
+      disconnectGoogle(); googleUser = null; renderCloudRecords();
       $('google-status').textContent = 'Connect your Google Sheet again to confirm the account. Your draft is still here.'; return;
     }
     if (cacheAccountId && cacheAccountId !== nextUser.id) {
       $('sheet-connected').hidden = true; $('sheet-setup').hidden = true;
       $('open-sheet').removeAttribute('href'); $('connected-sheet-name').textContent = '';
       if ((dirty || profileDirty) && !window.confirm('This is a different Google account. Clear the remembered draft and defaults, then switch accounts?')) {
-        active.disconnect(); sheets = null; workbook = null; clearGoogleSession(); renderCloudRecords();
+        disconnectGoogle(); googleUser = null; renderCloudRecords();
         $('google-status').textContent = 'Account switch cancelled. Your remembered draft is still on this device.'; return;
       }
       workbook = null; saveDevice(null); resetWorkingData(); renderCloudRecords();
@@ -926,7 +913,7 @@ async function connected(token, restoring = false, interactive = false) {
     $('google-session-status').hidden = saveGoogleSession({ ...token, accountId: nextUser.id }, googleConfig.clientId, forgetMarker);
     clearTimeout(expiryTimer);
     expiryTimer = setTimeout(() => cloudError(Object.assign(new Error('Your Google connection expired. Reconnect to continue. Your draft is still here.'), { code: 'expired' }), { quiet: true }), Math.max(0, token.expiresAt - Date.now()));
-    const previous = recordWorkbookId || stored(`sheetinvoice-sheet-${googleUser.id}`);
+    const previous = recordWorkbookId;
     if (previous) {
       const next = await active.load(previous);
       if (epoch === connectionEpoch) { if (reconnecting || (restoring && !interactive)) useWorkbook(next); else finishSheetConnection(next); }
@@ -934,7 +921,7 @@ async function connected(token, restoring = false, interactive = false) {
   } catch (error) {
     if (epoch === connectionEpoch) {
       if (!['expired', 'permission', 'privacy'].includes(error.code)) {
-        active.disconnect(); sheets = null; workbook = null; googleUser = null; clearTimeout(expiryTimer); renderCloudRecords();
+        disconnectGoogle(); googleUser = null; renderCloudRecords();
       }
       cloudError(error, { quiet: restoring && error.code === 'expired', focus: !restoring });
     }
@@ -979,7 +966,7 @@ $('existing-sheet').addEventListener('change', updateCloudControls);
 $('use-existing-sheet').addEventListener('click', () => cloudAction(async () => { const epoch = connectionEpoch, next = await sheets.load($('existing-sheet').value); if (epoch === connectionEpoch) finishSheetConnection(next); }));
 $('choose-sheet').addEventListener('click', () => cloudAction(async () => {
   const epoch = connectionEpoch;
-  if (!pickerReady) { await preparePicker(googleConfig); pickerReady = true; }
+  await preparePicker(googleConfig);
   if (epoch !== connectionEpoch) return;
   const id = await chooseSheet(googleConfig, sheets.token);
   if (!id || epoch !== connectionEpoch) return;
@@ -1000,7 +987,7 @@ $('apply-design').addEventListener('click', () => {
 });
 $('change-sheet').addEventListener('click', () => cloudAction(async () => {
   if ((dirty || profileDirty) && !window.confirm('Change Sheet and discard this unsaved draft?')) return;
-  workbook = null; saveDevice(null); resetWorkingData(); requiresSheetSave = false; renderCloudRecords(); persist(); $('sheet-connected').hidden = true;
+  workbook = null; saveDevice(null); resetWorkingData(); renderCloudRecords(); persist(); $('sheet-connected').hidden = true;
   await showSheetSetup();
 }));
 $('saved-customer').addEventListener('change', () => {
