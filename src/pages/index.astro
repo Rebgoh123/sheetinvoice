@@ -40,7 +40,8 @@ const googleConfig = {
         <p id="google-error" class="notice" role="alert" tabindex="-1" hidden></p>
         <div id="invoice-app" hidden>
           <section id="invoice-panel" class="iv-panel" role="tabpanel" aria-labelledby="invoice-tab">
-            <div class="iv-title-row"><div class="iv-title"><h1 id="invoice-heading">New invoice</h1><span id="draft-status" class="draft-status" role="status" hidden></span></div><button id="new-invoice" class="iv-text-button" type="button">Reset<Icon name="reset" /></button></div>
+            <div class="iv-title-row"><div class="iv-title"><h1 id="invoice-heading">New invoice</h1><span id="draft-status" class="draft-status" role="status" hidden></span></div><button id="new-invoice" class="iv-text-button" type="button">Reset<Icon name="reset" /></button><button id="close-edit" class="iv-text-button" type="button" aria-label="Close edit and go back" hidden>Close<Icon name="close" /></button></div>
+            <div id="reset-feedback" class="iv-inline-feedback" hidden><span role="status">New invoice started.</span><button id="undo-reset" class="iv-text-button" type="button">Undo reset</button></div>
             <div id="connect-hint" class="connect-hint"><span id="connect-hint-text">Keep your invoices in your own Sheet.</span><button class="iv-button iv-primary" type="button" data-connect-sheet disabled>Connect Google Sheet</button></div>
             <div id="error-box" class="notice" role="alert" tabindex="-1" hidden></div>
             <form id="invoice-form">
@@ -103,7 +104,6 @@ const googleConfig = {
                 <details id="new-sheet-options" class="iv-notes"><summary>Starting fresh? Create a new Sheet</summary><form id="create-sheet-form" class="sheet-create"><div><label for="sheet-name">New Sheet name</label><input id="sheet-name" value="My invoices" required maxlength="100" /></div><button id="create-sheet" class="iv-button" type="submit">Create private Sheet</button></form></details>
               </div>
               <div id="sheet-connected" hidden><div class="iv-sheet-name"><Icon name="sheet" /><div><strong id="connected-sheet-name"></strong><a id="open-sheet" target="_blank" rel="noopener noreferrer">Open Google Sheet<Icon name="external" /></a></div><span class="iv-small-badge iv-badge-paid">Private</span></div><button id="refresh-sheet" class="iv-text-button" type="button">Refresh records</button></div>
-              <details id="connection-options" class="iv-notes" hidden><summary>Connection options</summary><div class="sheet-actions"><button id="change-sheet" class="iv-text-button" type="button" hidden>Change Sheet</button><button id="disconnect-google" class="iv-text-button" type="button" hidden>Disconnect</button></div></details>
             </section>
             <details id="business-defaults" class="iv-setting-section iv-settings-details" aria-labelledby="business-heading">
               <summary><h2 id="business-heading">Business details</h2></summary>
@@ -142,13 +142,14 @@ const googleConfig = {
               <p id="design-warning" class="notice" role="status" hidden></p>
               <button id="apply-design" class="iv-text-button" type="button" hidden>Apply design to current invoice</button><p id="design-status" class="field-help" role="status"></p>
             </details>
-            <div class="iv-settings-clear"><button id="clear-device" class="iv-text-button" type="button">Clear this device’s data</button><p id="device-storage-status" class="field-help" role="status"></p></div>
+            <div class="iv-settings-clear"><div class="iv-settings-actions"><button id="change-sheet" class="iv-text-button" type="button" disabled>Change Sheet</button><button id="disconnect-google" class="iv-text-button" type="button" disabled>Disconnect</button><button id="clear-device" class="iv-text-button" type="button">Clear this device’s data</button></div><p id="device-storage-status" class="field-help" role="status"></p></div>
           </section>
           <section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>
             <div class="iv-export-navigation"><button id="result-back" class="iv-text-button" type="button">Back to invoice</button><button id="edit-invoice" class="iv-text-button" type="button" hidden>Edit invoice</button></div>
             <h1 id="result-heading" tabindex="-1">Invoice ready</h1>
             <div class="pdf-file"><Icon name="invoice" /><div><strong id="result-filename"></strong><p id="result-description"></p></div><span id="result-payment-status" class="iv-small-badge"></span></div>
             <p id="sheet-save-status" class="field-help" role="status"></p>
+            <p id="invoice-edit-status" class="field-help" role="status" hidden>Unsaved edits are kept on this device. Choose Edit invoice to resume.</p>
             <p class="field-help iv-preview-profile">Uses your latest business details, labels and signature.</p>
             <div class="iv-export-format"><span id="result-format-label">File format</span><div class="iv-status-filters" role="group" aria-labelledby="result-format-label"><button type="button" data-export-format="pdf" aria-pressed="true">PDF</button><button type="button" data-export-format="jpg" aria-pressed="false">JPG</button></div><span id="result-format-status" class="field-help" role="status"></span></div>
             <p id="result-error" class="notice" role="alert" hidden></p>
@@ -160,6 +161,7 @@ const googleConfig = {
             <img id="invoice-image" class="invoice-image-preview" alt="Invoice preview" hidden />
             <details class="iv-notes summary-area"><summary>WhatsApp message</summary><label class="sr-only" for="whatsapp-summary">WhatsApp summary</label><textarea id="whatsapp-summary" rows="7" readonly></textarea><div class="summary-actions"><button id="copy-summary" class="iv-text-button" type="button"><Icon name="copy" />Copy message</button><a id="open-whatsapp" class="iv-text-button" target="_blank" rel="noopener noreferrer">Open WhatsApp<Icon name="external" /></a></div></details>
           </section>
+          <dialog id="replace-draft" class="iv-dialog" aria-labelledby="replace-draft-heading" aria-describedby="replace-draft-description"><h2 id="replace-draft-heading">Switch invoice?</h2><p id="replace-draft-description"></p><div class="sheet-actions"><button id="cancel-edit" class="iv-button" type="button" autofocus>Cancel</button><button id="confirm-edit" class="iv-button iv-primary" type="button">Replace draft &amp; edit</button></div></dialog>
         </div>
       </main>
       <footer class="iv-site-footer"><a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></footer>

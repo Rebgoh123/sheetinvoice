@@ -1,6 +1,6 @@
 ---
-import { FileText, History, Settings2, Plus, RotateCcw, ArrowUpRight, Trash2, Check, Sheet, ExternalLink, Share2, Download, Copy } from 'lucide';
-const icons = { invoice: FileText, history: History, settings: Settings2, plus: Plus, reset: RotateCcw, arrow: ArrowUpRight, trash: Trash2, check: Check, sheet: Sheet, external: ExternalLink, share: Share2, download: Download, copy: Copy };
+import { FileText, History, Settings2, Plus, RotateCcw, ArrowUpRight, Trash2, Check, Sheet, ExternalLink, Share2, Download, Copy, X } from 'lucide';
+const icons = { invoice: FileText, history: History, settings: Settings2, plus: Plus, reset: RotateCcw, arrow: ArrowUpRight, trash: Trash2, check: Check, sheet: Sheet, external: ExternalLink, share: Share2, download: Download, copy: Copy, close: X };
 type Props = { name: keyof typeof icons; class?: string };
 const { name, class: className } = Astro.props;
 ---

@@ -34,6 +34,7 @@ let baseRevision = remembered?.baseRevision || null, historyPage = 0;
 let activeView = 'invoice', previousView = 'invoice', customerMode = 'new', historyStatus = 'all';
 const paymentRetries = new Map(), deletionRetries = new Map();
 let pendingDeletion = null, lastDeleted = null;
+let editReturnRecord = null, resetUndo = null, pendingEdit = null;
 const googleConfig = JSON.parse($('invoice-google-config').textContent);
 const exportLabel = () => `${workbook ? 'Save &' : 'Generate'} ${exportFormat.toUpperCase()}`;
 const savedItems = () => workbook?.savedItems ?? cachedItems;
@@ -153,6 +154,8 @@ function persist() {
   $('draft-status').textContent = dirty ? (deviceSaved ? 'Saved on device' : 'Unsaved changes') : '';
   $('draft-status').hidden = !dirty;
   $('invoice-heading').textContent = baseRevision ? 'Edit invoice' : 'New invoice';
+  $('close-edit').hidden = !baseRevision; $('new-invoice').hidden = !!baseRevision;
+  $('reset-feedback').hidden = !resetUndo;
   $('invoice-details-summary').textContent = [invoice.number, invoice.date].filter(Boolean).join(' · ');
 }
 function errors(messages = []) {
@@ -221,6 +224,7 @@ function displayExport(result) {
   $('result-heading').textContent = record ? `Invoice ${snapshot.number}` : 'Invoice ready';
   $('result-back').textContent = record ? 'Back to transactions' : 'Back to invoice';
   $('edit-invoice').hidden = !record;
+  $('invoice-edit-status').hidden = !record || recordId !== record.id || baseRevision !== record.revision || !dirty;
   $('result-error').hidden = true; $('result-format-status').textContent = ''; $('share-status').textContent = '';
   document.querySelectorAll('[data-export-format]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.exportFormat === format)));
   $('whatsapp-summary').value = invoiceSummary(snapshot);
@@ -264,6 +268,7 @@ async function finishSettings() {
 }
 function changed(event) {
   if (event?.target?.id === 'export-format') return;
+  resetUndo = null;
   if (event?.target?.id === 'invoice-number') automaticNumber = null;
   readForm(); revision++; recordRevision = crypto.randomUUID(); dirty = true;
   const selected = workbook?.customers.find(customer => customer.id === customerId);
@@ -439,7 +444,7 @@ async function completeInvoice({ exportFile = true } = {}) {
       if (epoch !== connectionEpoch) return;
       workbook = saved.workbook; savedToSheet = true;
       if (recordId === saveRecord.id) baseRevision = saveRecord.revision;
-      if (version === revision) { customerId = saved.customerId; dirty = false; }
+      if (version === revision) { customerId = saved.customerId; dirty = false; resetUndo = null; }
       renderCloudRecords();
     }
     if (!exportFile) {
@@ -473,7 +478,7 @@ $('export-format').addEventListener('change', () => {
 });
 for (const [id, direction] of [['image-previous', -1], ['image-next', 1]]) $(id).addEventListener('click', () => showExportPage(exportPage + direction));
 $('result-back').addEventListener('click', () => showView(generated?.record ? 'history' : 'invoice'));
-$('edit-invoice').addEventListener('click', () => { if (generated?.record) editRecord(generated.record); });
+$('edit-invoice').addEventListener('click', () => { if (generated?.record) editRecord(generated.record, { returnToPreview: true }); });
 document.querySelectorAll('[data-export-format]').forEach(button => button.addEventListener('click', () => changeExportFormat(button.dataset.exportFormat)));
 async function changeExportFormat(format) {
   if (!generated || generated.format === format || generating || sharing || googleBusy) return;
@@ -554,8 +559,11 @@ $("copy-summary").addEventListener("click", async () => {
 function startInvoice(selectedCustomer) {
   let number;
   try { number = suggestedNumber(); } catch (error) { errors([error.message]); return; }
-  if ((dirty || (generated && !generated.record)) && !window.confirm('Replace this invoice with a new one? Save it to Sheets first if you need to keep it.')) return;
-  readForm(); const seller = { ...business };
+  readForm();
+  resetUndo = dirty || baseRevision || (generated && !generated.record) ? structuredClone({ invoice, automaticNumber, recordId, recordRevision, baseRevision, customerId, dirty, recordWorkbookId, editReturnRecord }) : resetUndo;
+  editReturnRecord = null;
+  $('history-feedback').textContent = ''; $('history-feedback').hidden = true;
+  const seller = { ...business };
   revision++; recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); customerId = null; dirty = false; $('saved-customer').value = ''; discardExport(); errors(); invoice = newInvoice(seller, undefined, sheetDesign());
   if (number) invoice.number = number;
   automaticNumber = invoice.number; fillForm(); persist(); updateCloudControls();
@@ -566,6 +574,22 @@ function startInvoice(selectedCustomer) {
   showView('invoice'); $('saved-customer-field').hidden ? $('customer-name').focus() : $('saved-customer').focus();
 }
 $('new-invoice').addEventListener('click', () => startInvoice());
+$('undo-reset').addEventListener('click', () => {
+  if (!resetUndo || googleBusy || generating) return;
+  ({ invoice, automaticNumber, recordId, recordRevision, baseRevision, customerId, dirty, recordWorkbookId, editReturnRecord } = resetUndo);
+  resetUndo = null; invoice.seller = normalizeSeller(business); revision++;
+  discardExport(); errors(); fillForm(); renderCloudRecords(); persist(); showView('invoice');
+});
+$('close-edit').addEventListener('click', async () => {
+  if (googleBusy || generating || sharing) return;
+  readForm(); persist();
+  if (editReturnRecord && workbook?.invoices.some(record => record.id === editReturnRecord.id)) {
+    await openRecord(editReturnRecord);
+  } else {
+    showView('history');
+    if (dirty) { $('history-feedback').textContent = `Edits for ${invoice.number} kept on this device. Choose Edit on this invoice to resume.`; $('history-feedback').hidden = false; }
+  }
+});
 $('history-new-invoice').addEventListener('click', () => startInvoice($('history-customer').value));
 $("clear-device").addEventListener("click", () => {
   if (!window.confirm('Clear remembered invoices and defaults on this device and disconnect Google? Saved Google Sheets records will stay.')) return;
@@ -584,6 +608,7 @@ window.addEventListener('pageshow', () => {
 fillBusinessForm(); fillForm(); renderSavedItems(); $("invoice-app").hidden = false; persist();
 
 function resetWorkingData() {
+  editReturnRecord = null; resetUndo = null;
   exportFormat = 'pdf'; $('export-format').value = exportFormat;
   cachedItems = []; cachedDesign = normalizeDesign(); cacheAccountId = null; recordWorkbookId = null;
   resetBusinessProfile(); invoice = newInvoice(); dirty = false; customerId = null;
@@ -605,16 +630,15 @@ function updateCloudControls() {
   const canRestore = !!loadGoogleSession(googleConfig.clientId, forgetMarker);
   $('connect-google').disabled = (!tokenClient && !googleLoadFailed && !canRestore) || googleBusy || generating;
   $('connect-google').hidden = !!sheets;
-  $('disconnect-google').hidden = !sheets && !googleUser;
-  $('connection-options').hidden = !sheets && !googleUser;
-  $('change-sheet').hidden = !workbook;
+  $('disconnect-google').disabled = (!sheets && !googleUser) || googleBusy || generating;
+  $('change-sheet').disabled = !workbook || googleBusy || generating;
   const connectLabel = restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : requiresSheetSave ? 'Reconnect' : 'Connect Google Sheet';
   $('connect-google').textContent = connectLabel;
   for (const button of document.querySelectorAll('[data-connect-sheet]')) {
     button.disabled = $('connect-google').disabled;
     button.textContent = connectLabel;
   }
-  for (const id of ['create-sheet', 'refresh-sheet', 'change-sheet', 'save-business-defaults', 'setup-saved-items', 'setup-design', 'apply-design', 'disconnect-google']) $(id).disabled = googleBusy || generating;
+  for (const id of ['create-sheet', 'refresh-sheet', 'save-business-defaults', 'setup-saved-items', 'setup-design', 'apply-design']) $(id).disabled = googleBusy || generating;
   $('save-business-defaults').disabled ||= signatureBusy;
   for (const id of ['upload-signature', 'remove-signature']) $(id).disabled = signatureBusy || generating || googleBusy;
   $('settings-done').disabled = signatureBusy || generating;
@@ -627,6 +651,8 @@ function updateCloudControls() {
   $('export-format').disabled = generating || sharing;
   for (const button of document.querySelectorAll('[data-export-format]')) button.disabled = googleBusy || generating || sharing;
   $('edit-invoice').disabled = googleBusy || generating || sharing;
+  $('close-edit').disabled = googleBusy || generating || sharing;
+  $('undo-reset').disabled = googleBusy || generating;
   $('share-pdf').disabled = generating || sharing;
   if (!generating) $('generate-pdf').querySelector('span').textContent = exportLabel();
   $('save-invoice').disabled = generating || signatureBusy || googleBusy || !workbook || !sheets;
@@ -681,6 +707,7 @@ function renderCloudRecords() {
   if (!workbook) {
     historyStatus = 'all'; historyPage = 0; paymentRetries.clear(); deletionRetries.clear(); lastDeleted = null;
     pendingDeletion = null; $('delete-transaction').close();
+    pendingEdit = null; $('replace-draft').close();
     $('history-feedback').textContent = ''; $('history-feedback').hidden = true;
   }
   $('undo-delete').hidden = !lastDeleted || lastDeleted.workbookId !== workbook?.id;
@@ -708,6 +735,9 @@ function renderHistory() {
   for (const record of records.slice(historyPage * 10, historyPage * 10 + 10)) {
     const saved = record.invoice, paid = saved.status === 'paid';
     const row = document.createElement('li'); row.className = 'iv-history-row';
+    const open = document.createElement('button'); open.type = 'button'; open.className = 'iv-row-open';
+    open.setAttribute('aria-label', `Open invoice ${saved.number} for ${saved.customer.name}`);
+    open.addEventListener('click', () => openRecord(record));
     const id = document.createElement('div'); id.className = 'iv-history-id';
     const number = document.createElement('strong'); number.textContent = saved.number;
     const date = document.createElement('small'); date.textContent = displayDate(saved.date); id.append(number, date);
@@ -718,8 +748,8 @@ function renderHistory() {
     const status = document.createElement('div'); status.className = 'iv-history-status';
     const badge = document.createElement('span'); badge.className = `iv-small-badge iv-badge-${paid ? 'paid' : 'unpaid'}`; badge.textContent = paid ? 'Paid' : 'Unpaid'; status.append(badge);
     const actions = document.createElement('div'); actions.className = 'iv-history-actions';
-    const open = document.createElement('button'); open.type = 'button'; open.className = 'iv-text-button'; open.textContent = 'Open'; open.setAttribute('aria-label', `Open invoice ${saved.number}`);
-    open.addEventListener('click', () => openRecord(record)); actions.append(open);
+    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'iv-text-button'; edit.textContent = 'Edit'; edit.setAttribute('aria-label', `Edit invoice ${saved.number}`);
+    edit.addEventListener('click', () => openRecord(record, { edit: true })); actions.append(edit);
     if (!paid) {
       const pay = document.createElement('button'); pay.type = 'button'; pay.className = 'iv-text-button'; pay.textContent = 'Mark paid'; pay.setAttribute('aria-label', `Mark invoice ${saved.number} paid`);
       pay.addEventListener('click', () => markRecordPaid(record)); actions.append(pay);
@@ -730,25 +760,26 @@ function renderHistory() {
       $('delete-transaction-description').textContent = `Delete invoice ${saved.number} for ${saved.customer.name} (${formatMoney(invoiceTotal(saved))}) from your transactions? Customer details stay saved. You can undo this deletion here.`;
       $('delete-transaction').showModal();
     }); actions.append(remove);
-    row.append(id, customer, amount, status, actions); list.append(row);
+    row.append(open, id, customer, amount, status, actions); list.append(row);
   }
   $('history-pagination').hidden = records.length <= 10;
   $('history-page').textContent = records.length ? `${historyPage * 10 + 1}–${Math.min((historyPage + 1) * 10, records.length)} of ${records.length}` : '';
 }
-async function openRecord(record) {
+async function openRecord(record, { edit = false } = {}) {
   if (googleBusy || generating || sharing) return;
-  const epoch = connectionEpoch, format = exportFormat;
+  const epoch = connectionEpoch, format = exportFormat, returnView = activeView;
   generating = true; updateCloudControls();
   $('google-error').hidden = true;
   $('history-feedback').textContent = `Opening invoice ${record.invoice.number}…`; $('history-feedback').hidden = false;
   try {
     await refreshBusiness();
-    if (epoch !== connectionEpoch || activeView !== 'history') return;
+    if (epoch !== connectionEpoch || activeView !== returnView) return;
     record = workbook.invoices.find(current => current.id === record.id);
     if (!record) throw new Error('This transaction was deleted. Your records have been refreshed.');
+    if (edit) { generating = false; editRecord(record); return; }
     const snapshot = currentBusinessInvoice(record.invoice);
     const output = await invoiceFiles(snapshot, format);
-    if (epoch !== connectionEpoch || activeView !== 'history') return;
+    if (epoch !== connectionEpoch || activeView !== returnView) return;
     displayExport({ ...output, format, invoice: snapshot, record: structuredClone(record), savedToSheet: true });
     showView('pdf');
   } catch (error) {
@@ -758,11 +789,29 @@ async function openRecord(record) {
     generating = false; $('history-feedback').hidden = true; updateCloudControls();
   }
 }
-function editRecord(record) {
-  if (googleBusy || generating || sharing || (dirty && !window.confirm('Edit this invoice and replace your current draft? Save your draft to Sheets first if you need to keep it.'))) return false;
+function editRecord(record, { returnToPreview = false, replaceDraft = false } = {}) {
+  if (googleBusy || generating || sharing) return false;
+  // Reopening the same edit resumes its local draft instead of replacing it with the Sheet copy.
+  if (recordId === record.id && baseRevision === record.revision) {
+    editReturnRecord = returnToPreview ? structuredClone(record) : null;
+    showView('invoice'); return true;
+  }
+  if (dirty && !replaceDraft) {
+    pendingEdit = { record: structuredClone(record), returnToPreview, workbookId: workbook?.id };
+    $('replace-draft-description').textContent = `You have unsaved edits on this device. Editing invoice ${record.invoice.number} will replace them. Save your current invoice first if you want to keep it.`;
+    $('replace-draft').showModal(); return false;
+  }
+  editReturnRecord = returnToPreview ? structuredClone(record) : null; resetUndo = null;
   invoice = currentBusinessInvoice(record.invoice); automaticNumber = null; invoice.status ||= 'unpaid'; recordId = record.id; recordRevision = record.revision; baseRevision = record.revision; customerId = record.customerId; dirty = false; revision++; discardExport(); errors(); fillForm(); renderCloudRecords(); persist(); showView('invoice');
   return true;
 }
+$('cancel-edit').addEventListener('click', () => $('replace-draft').close());
+$('replace-draft').addEventListener('close', () => { pendingEdit = null; });
+$('confirm-edit').addEventListener('click', () => {
+  const target = pendingEdit;
+  $('replace-draft').close();
+  if (target && workbook?.id === target.workbookId) editRecord(target.record, { returnToPreview: target.returnToPreview, replaceDraft: true });
+});
 async function markRecordPaid(record) {
   if (!workbook || !sheets) return;
   return cloudAction(async () => {

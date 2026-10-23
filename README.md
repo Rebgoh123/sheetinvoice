@@ -10,7 +10,13 @@ There is no separate website account or password. The app is public; Google auth
 2. **Select your Sheet** from the list or **Choose from Google Drive**. If you are starting fresh, expand **Create a new Sheet** instead. Only SheetInvoice workbooks are supported; arbitrary spreadsheet layouts are not imported or overwritten.
 3. A new Sheet opens **Business details**. Enter your business name, add any other details you need, then **Save & start invoicing**. Optional fields are under **More business details**. An existing Sheet with business details returns straight to the invoice.
 4. Enter a customer and items, then **Save** or **Save & PDF** / **Save & JPG**. Invoice number and date are filled automatically; expand **Invoice details** to edit them. New invoices are unpaid; tick **Mark as paid** when paid.
-5. Use **Past transactions** to filter by customer and payment status, open an invoice, mark it paid or delete it. Deleting asks for confirmation and offers **Undo deletion** for the last deletion during this connection. Customer details stay saved.
+5. Use **Past transactions** to filter by customer and payment status. Tap anywhere on a transaction row to preview its invoice. **Edit**, **Mark paid** and **Delete** are separate quick actions; they do not open the preview. Deleting asks for confirmation and offers **Undo deletion** for the last deletion during this connection. Customer details stay saved.
+
+When editing a saved invoice, **Close** returns to its preview or the transaction list, depending on where editing began. Unsaved changes stay in the working invoice on this device; choose **Edit** on the same transaction to resume. Use **Save** to update the Sheet. Opening a different invoice for editing still asks before replacing an unsaved working draft.
+
+**Reset** starts a new invoice immediately, without a confirmation popup. **Undo reset** restores the previous working invoice until you begin editing the new one or refresh the page. Reset does not change saved transactions.
+
+**Change Sheet**, **Disconnect** and **Clear this device’s data** are always visible at the bottom of Settings. Change Sheet and Disconnect are disabled when no connection is available.
 
 To choose your invoice number series, open **Settings → Business details → More business details → Start invoice numbers at** and save. For example, `40108` continues as `40109`, while `INV-0001` continues as `INV-0002`. The value is saved as **Invoice number start** in the Sheet's **Settings** tab; you can edit that row directly, then **Refresh records**. Keep the value as plain text to preserve leading zeros. Leave it blank to use the original date-based numbers.
 
