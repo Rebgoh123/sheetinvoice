@@ -137,9 +137,12 @@ const googleConfig = {
             <details class="iv-notes"><summary>This device</summary><p class="field-help">Your current invoice and defaults are remembered in this browser. The temporary Google connection is kept for this tab until it expires, so refreshing can restore your Sheet. Disconnect when finished on a shared device. Transaction history is loaded directly from Google.</p><p id="device-storage-status" class="field-help" role="status"></p><div class="device-actions"><button id="clear-device" class="iv-text-button" type="button">Clear this device’s data</button></div></details>
           </section>
           <section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>
-            <div class="iv-title-row"><h1 id="result-heading" tabindex="-1">Invoice ready</h1><button id="edit-invoice" class="iv-text-button" type="button">Back to invoice</button></div>
+            <div class="iv-export-navigation"><button id="result-back" class="iv-text-button" type="button">Back to invoice</button><button id="edit-invoice" class="iv-text-button" type="button" hidden>Edit invoice</button></div>
+            <h1 id="result-heading" tabindex="-1">Invoice ready</h1>
             <div class="pdf-file"><Icon name="invoice" /><div><strong id="result-filename"></strong><p id="result-description"></p></div><span id="result-payment-status" class="iv-small-badge"></span></div>
             <p id="sheet-save-status" class="field-help" role="status"></p>
+            <div class="iv-export-format"><span id="result-format-label">File format</span><div class="iv-status-filters" role="group" aria-labelledby="result-format-label"><button type="button" data-export-format="pdf" aria-pressed="true">PDF</button><button type="button" data-export-format="jpg" aria-pressed="false">JPG</button></div><span id="result-format-status" class="field-help" role="status"></span></div>
+            <p id="result-error" class="notice" role="alert" hidden></p>
             <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button"><Icon name="share" /><span>Share PDF</span></button><a id="view-pdf" class="iv-button" target="_blank" rel="noopener"><span>View PDF</span><Icon name="external" /></a><a id="download-pdf" class="iv-button" download><span>Download</span><Icon name="download" /></a></div>
             <p id="share-help" class="field-help"></p><p id="share-status" class="field-help" role="status"></p>
             <div id="image-page-controls" class="history-pagination" hidden><button id="image-previous" class="iv-text-button" type="button">Previous page</button><span id="image-page" role="status"></span><button id="image-next" class="iv-text-button" type="button">Next page</button></div>

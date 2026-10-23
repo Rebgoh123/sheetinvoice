@@ -182,6 +182,10 @@ body { margin:0; }
 .invoice-app #connect-google { margin-top:14px; }
 .invoice-app #business-form .iv-meta-grid { max-width:none; }
 .invoice-app #save-business-defaults { margin-top:18px; }
+.invoice-app .iv-export-navigation { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+.invoice-app #result-heading { margin-bottom:20px; overflow-wrap:anywhere; }
+.invoice-app .iv-export-format { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:20px; font-size:12px; }
+.invoice-app .iv-export-format .field-help { margin:0; }
 .invoice-app .pdf-file { display:flex; align-items:center; gap:15px; padding:20px 0; border-block:1px solid var(--iv-line); }
 .invoice-app .pdf-file>svg { width:30px; height:30px; color:var(--iv-accent); flex-shrink:0; }
 .invoice-app .pdf-file>div { flex:1; min-width:0; overflow-wrap:anywhere; }

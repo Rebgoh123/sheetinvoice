@@ -81,9 +81,11 @@ function showView(view, focus = true) {
   activeView = view;
   for (const [name, id] of [['invoice', 'invoice-panel'], ['history', 'history-panel'], ['settings', 'settings-panel'], ['pdf', 'pdf-result']]) $(id).hidden = view !== name;
   for (const name of ['invoice', 'history']) {
-    const selected = name === view || (name === 'invoice' && view === 'pdf');
+    const exportTab = generated?.record ? 'history' : 'invoice';
+    const selected = name === view || (name === exportTab && view === 'pdf');
     $(`${name}-tab`).setAttribute('aria-selected', String(selected));
-    const settingsReturn = view === 'settings' && name === (previousView === 'history' ? 'history' : 'invoice');
+    $(`${name}-tab`).setAttribute('aria-controls', selected && view === 'pdf' ? 'pdf-result' : `${name}-panel`);
+    const settingsReturn = view === 'settings' && name === (previousView === 'history' || (previousView === 'pdf' && exportTab === 'history') ? 'history' : 'invoice');
     $(`${name}-tab`).tabIndex = selected || settingsReturn ? 0 : -1;
   }
   $('settings-button').setAttribute('aria-expanded', String(view === 'settings'));
@@ -154,7 +156,7 @@ function showExportPage(index = 0) {
   exportPage = Math.max(0, Math.min(index, generated.files.length - 1));
   const file = generated.files[exportPage], url = objectUrls[exportPage], image = generated.format === 'jpg';
   $('download-pdf').href = url; $('download-pdf').download = file.name;
-  $('download-pdf').querySelector('span').textContent = generated.files.length > 1 ? `Download page ${exportPage + 1}` : `Download ${generated.format.toUpperCase()}`;
+  $('download-pdf').querySelector('span').textContent = generated.files.length > 1 ? `Save page ${exportPage + 1} as JPG` : `Save as ${generated.format.toUpperCase()}`;
   $('view-pdf').href = url; $('view-pdf').querySelector('span').textContent = image ? 'View JPG' : 'View PDF';
   $('result-filename').textContent = file.name;
   $('invoice-image').hidden = !image;
@@ -164,6 +166,7 @@ function showExportPage(index = 0) {
   $('image-previous').disabled = exportPage === 0; $('image-next').disabled = exportPage === generated.files.length - 1;
 }
 function discardExport() {
+  const returnView = generated?.record ? 'history' : 'invoice';
   generated = null;
   clearExportUrls(); exportPage = 0;
   $('invoice-image').hidden = true; $('image-page-controls').hidden = true;
@@ -174,8 +177,37 @@ function discardExport() {
   $('sheet-save-status').textContent = '';
   $('invoice-save-status').textContent = '';
   $('invoice-save-status').hidden = true;
-  if (activeView === 'pdf') showView('invoice', false);
+  $('result-error').hidden = true; $('result-format-status').textContent = '';
+  if (activeView === 'pdf') showView(returnView, false);
   if (!generating) $("generate-pdf").querySelector("span").textContent = exportLabel();
+}
+async function invoiceFiles(snapshot, format) {
+  const { generateInvoicePdf, generateInvoiceJpg } = await import('./invoice-export.mjs');
+  const blobs = format === 'jpg' ? await generateInvoiceJpg(snapshot) : [new Blob([await generateInvoicePdf(snapshot)], { type: 'application/pdf' })];
+  return blobs.map((blob, index) => new File([blob], invoiceFilename(snapshot, format, blobs.length > 1 ? index + 1 : null), { type: blob.type }));
+}
+function displayExport(result) {
+  clearExportUrls();
+  generated = result;
+  const { files, format, invoice: snapshot, record, savedToSheet } = result, formatLabel = format.toUpperCase();
+  objectUrls = files.map(file => URL.createObjectURL(file));
+  showExportPage();
+  $('result-heading').textContent = record ? `Invoice ${snapshot.number}` : 'Invoice ready';
+  $('result-back').textContent = record ? 'Back to transactions' : 'Back to invoice';
+  $('edit-invoice').hidden = !record;
+  $('result-error').hidden = true; $('result-format-status').textContent = ''; $('share-status').textContent = '';
+  document.querySelectorAll('[data-export-format]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.exportFormat === format)));
+  $('whatsapp-summary').value = invoiceSummary(snapshot);
+  $('open-whatsapp').href = whatsappUrl(snapshot);
+  $('result-description').textContent = `${snapshot.customer.name.trim()} · ${displayDate(snapshot.date)} · ${formatMoney(invoiceTotal(snapshot))} · ${(files.reduce((size, file) => size + file.size, 0) / 1024).toFixed(0)} KB · ${files.length > 1 ? `${files.length} JPG pages` : formatLabel}`;
+  $('result-payment-status').textContent = snapshot.status === 'paid' ? 'Paid' : 'Unpaid';
+  $('result-payment-status').className = `iv-small-badge iv-badge-${snapshot.status}`;
+  $('sheet-save-status').textContent = record ? '' : savedToSheet ? 'Saved to your Google Sheet.' : `${formatLabel} only. This invoice has not been saved to Google Sheets.`;
+  $('sheet-save-status').hidden = !!record;
+  const canShare = supportsFileShare(files);
+  $('share-pdf').querySelector('span').textContent = canShare ? `Share ${formatLabel}${files.length > 1 ? ' pages' : ''}` : `Download ${formatLabel} to share`;
+  $('share-help').textContent = canShare ? 'Choose WhatsApp from the share menu.'
+    : files.length > 1 ? 'Download each JPG page, then attach the images in WhatsApp.' : `Download the ${formatLabel}, then attach it in WhatsApp.`;
 }
 function changed(event) {
   if (event?.target?.id === 'export-format') return;
@@ -329,25 +361,10 @@ async function completeInvoice({ exportFile = true } = {}) {
       persist(); return;
     }
     button.querySelector('span').textContent = `Creating ${formatLabel}…`;
-    const { generateInvoicePdf, generateInvoiceJpg } = await import("./invoice-export.mjs");
-    const blobs = format === 'jpg' ? await generateInvoiceJpg(snapshot) : [new Blob([await generateInvoicePdf(snapshot)], { type: 'application/pdf' })];
+    const files = await invoiceFiles(snapshot, format);
     if (epoch !== connectionEpoch) return;
     if (version !== revision) { errors([savedToSheet ? `Earlier details saved. Choose Save & ${formatLabel} again for your latest edits.` : `The details changed. Generate the ${formatLabel} again.`]); return; }
-    const files = blobs.map((blob, index) => new File([blob], invoiceFilename(snapshot, format, blobs.length > 1 ? index + 1 : null), { type: blob.type }));
-    generated = { files, format, invoice: snapshot };
-    objectUrls = files.map(file => URL.createObjectURL(file));
-    showExportPage();
-    $("whatsapp-summary").value = invoiceSummary(snapshot);
-    $("open-whatsapp").href = whatsappUrl(snapshot);
-    $("result-description").textContent = `${snapshot.customer.name.trim()} · ${formatMoney(invoiceTotal(snapshot))} · ${(files.reduce((size, file) => size + file.size, 0) / 1024).toFixed(0)} KB · ${files.length > 1 ? `${files.length} JPG pages` : formatLabel}`;
-    $('result-payment-status').textContent = snapshot.status === 'paid' ? 'Paid' : 'Unpaid';
-    $('result-payment-status').className = `iv-small-badge iv-badge-${snapshot.status}`;
-    $('sheet-save-status').textContent = savedToSheet ? 'Saved to your Google Sheet.' : `${formatLabel} only. This invoice has not been saved to Google Sheets.`;
-    const canShare = supportsFileShare(files);
-    $("share-pdf").querySelector("span").textContent = canShare ? `Share ${formatLabel}${files.length > 1 ? ' pages' : ''}` : `Download ${formatLabel} to share`;
-    $("share-help").textContent = canShare
-      ? 'Choose WhatsApp from the share menu.'
-      : files.length > 1 ? 'Download each JPG page, then attach the images in WhatsApp.' : `Download the ${formatLabel}, then attach it in WhatsApp.`;
+    displayExport({ files, format, invoice: snapshot, savedToSheet });
     showView('pdf');
     persist();
   } catch (error) {
@@ -367,7 +384,28 @@ $('export-format').addEventListener('change', () => {
   discardExport(); updateCloudControls(); persist();
 });
 for (const [id, direction] of [['image-previous', -1], ['image-next', 1]]) $(id).addEventListener('click', () => showExportPage(exportPage + direction));
-$('edit-invoice').addEventListener('click', () => showView('invoice'));
+$('result-back').addEventListener('click', () => showView(generated?.record ? 'history' : 'invoice'));
+$('edit-invoice').addEventListener('click', () => { if (generated?.record) editRecord(generated.record); });
+document.querySelectorAll('[data-export-format]').forEach(button => button.addEventListener('click', () => changeExportFormat(button.dataset.exportFormat)));
+async function changeExportFormat(format) {
+  if (!generated || generated.format === format || generating || sharing || googleBusy) return;
+  const source = generated, epoch = connectionEpoch;
+  generating = true; updateCloudControls(); $('result-error').hidden = true;
+  $('result-format-status').textContent = `Creating ${format.toUpperCase()}…`;
+  try {
+    // Switching file format only renders the snapshot; it never saves or edits a Sheet record.
+    const files = await invoiceFiles(source.invoice, format);
+    if (epoch !== connectionEpoch || generated !== source) return;
+    displayExport({ ...source, files, format });
+    exportFormat = format; $('export-format').value = format;
+  } catch {
+    if (epoch !== connectionEpoch || generated !== source) return;
+    $('result-error').textContent = `The ${format.toUpperCase()} could not be created. Your ${source.format.toUpperCase()} is still available. Try again.`;
+    $('result-error').hidden = false;
+  } finally {
+    generating = false; $('result-format-status').textContent = ''; updateCloudControls(); persist();
+  }
+}
 for (const name of ['invoice', 'history']) $(`${name}-tab`).addEventListener('click', () => showView(name));
 document.querySelectorAll('[role=tab]').forEach((tab, index, tabs) => tab.addEventListener('keydown', event => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -399,7 +437,7 @@ $("share-pdf").addEventListener("click", async () => {
     $("share-status").textContent = files.length > 1 ? 'Download each page, then attach all the JPG images in WhatsApp.' : `Save the ${formatLabel}, then tap Open WhatsApp and attach it to the message.`;
     return;
   }
-  sharing = true; $("share-pdf").disabled = true;
+  sharing = true; updateCloudControls();
   try {
     // File is prepared before this click, preserving the required user gesture.
     await navigator.share({ files, title: `Invoice ${generated.invoice.number}`, text: invoiceSummary(generated.invoice) });
@@ -408,7 +446,7 @@ $("share-pdf").addEventListener("click", async () => {
     $("share-status").textContent = error.name === "AbortError"
       ? `Sharing cancelled. Your ${formatLabel} is still ready.`
       : `File sharing wasn’t available. Download the ${formatLabel}${files.length > 1 ? ' pages' : ''} and attach ${files.length > 1 ? 'them' : 'it'} in WhatsApp instead.`;
-  } finally { sharing = false; $("share-pdf").disabled = false; }
+  } finally { sharing = false; updateCloudControls(); }
 });
 $("copy-summary").addEventListener("click", async () => {
   if (!generated) return;
@@ -424,7 +462,7 @@ $("copy-summary").addEventListener("click", async () => {
 function startInvoice(selectedCustomer) {
   let number;
   try { number = suggestedNumber(); } catch (error) { errors([error.message]); return; }
-  if ((dirty || generated) && !window.confirm('Replace this invoice with a new one? Save it to Sheets first if you need to keep it.')) return;
+  if ((dirty || (generated && !generated.record)) && !window.confirm('Replace this invoice with a new one? Save it to Sheets first if you need to keep it.')) return;
   readForm(); const seller = { ...business };
   revision++; recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); customerId = null; dirty = false; $('saved-customer').value = ''; discardExport(); errors(); invoice = newInvoice(seller, undefined, sheetDesign());
   if (number) invoice.number = number;
@@ -492,6 +530,9 @@ function updateCloudControls() {
   $('use-existing-sheet').disabled = !sheets || !$('existing-sheet').value || googleBusy || generating;
   $('generate-pdf').disabled = generating || (googleBusy && !!sheets);
   $('export-format').disabled = generating || sharing;
+  for (const button of document.querySelectorAll('[data-export-format]')) button.disabled = googleBusy || generating || sharing;
+  $('edit-invoice').disabled = googleBusy || generating || sharing;
+  $('share-pdf').disabled = generating || sharing;
   if (!generating) $('generate-pdf').querySelector('span').textContent = exportLabel();
   $('save-invoice').disabled = generating || googleBusy || !workbook || !sheets;
   $('history-customer').disabled = !workbook || googleBusy || generating;
@@ -515,6 +556,7 @@ function cloudError(error, { quiet = false, focus = true } = {}) {
     const expired = error.code === 'expired';
     sheets.disconnect(); sheets = null; workbook = null; connectionEpoch++; clearTimeout(expiryTimer);
     googleBusy = false; restoringSession = false;
+    if (generated?.record) discardExport();
     if (!expired) { forgetDevice(); forgetMarker = stored(FORGET_KEY); googleUser = null; requiresSheetSave = false; resetWorkingData(); }
     renderCloudRecords(); $('sheet-setup').hidden = true; $('sheet-connected').hidden = true;
     $('open-sheet').removeAttribute('href'); $('connected-sheet-name').textContent = ''; $('business-save-status').textContent = '';
@@ -589,8 +631,26 @@ function renderHistory() {
   $('history-pagination').hidden = records.length <= 10;
   $('history-page').textContent = records.length ? `${historyPage * 10 + 1}–${Math.min((historyPage + 1) * 10, records.length)} of ${records.length}` : '';
 }
-function openRecord(record) {
-  if (googleBusy || generating || (dirty && !window.confirm('Open this invoice and discard your unsaved changes?'))) return false;
+async function openRecord(record) {
+  if (googleBusy || generating || sharing) return;
+  const epoch = connectionEpoch, format = exportFormat, snapshot = structuredClone(record.invoice);
+  generating = true; updateCloudControls();
+  $('google-error').hidden = true;
+  $('history-feedback').textContent = `Opening invoice ${snapshot.number}…`; $('history-feedback').hidden = false;
+  try {
+    const files = await invoiceFiles(snapshot, format);
+    if (epoch !== connectionEpoch || activeView !== 'history') return;
+    displayExport({ files, format, invoice: snapshot, record: structuredClone(record), savedToSheet: true });
+    showView('pdf');
+  } catch {
+    if (epoch !== connectionEpoch) return;
+    cloudError(new Error('This invoice could not be opened. Your draft and saved records are unchanged. Try again.'));
+  } finally {
+    generating = false; $('history-feedback').hidden = true; updateCloudControls();
+  }
+}
+function editRecord(record) {
+  if (googleBusy || generating || sharing || (dirty && !window.confirm('Edit this invoice and replace your current draft? Save your draft to Sheets first if you need to keep it.'))) return false;
   invoice = structuredClone(record.invoice); automaticNumber = null; invoice.status ||= 'unpaid'; recordId = record.id; recordRevision = record.revision; baseRevision = record.revision; customerId = record.customerId; dirty = false; revision++; discardExport(); errors(); fillForm(); renderCloudRecords(); persist(); showView('invoice');
   return true;
 }
@@ -604,6 +664,7 @@ async function markRecordPaid(record) {
     const saved = await sheets.save(workbook.id, { id: record.id, revision: nextRevision, baseRevision: record.revision, customerId: record.customerId, invoice: { ...structuredClone(record.invoice), status: 'paid' } }, { updateCustomer: false });
     if (epoch !== connectionEpoch) return;
     workbook = saved.workbook; paymentRetries.delete(key);
+    if (generated?.record?.id === record.id) discardExport();
     if (recordId === record.id) {
       invoice.status = 'paid'; $('payment-status').checked = true; baseRevision = nextRevision;
       recordRevision = dirty ? crypto.randomUUID() : nextRevision; revision++; discardExport(); updateTotals(); persist();
