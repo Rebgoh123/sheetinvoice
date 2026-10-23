@@ -24,6 +24,7 @@ const canonical = Astro.site ? new URL(`${base}privacy/`, Astro.site).href : nul
           <h1>Privacy &amp; data</h1>
           <p><strong>Your Google Sheet stores your records. SheetInvoice reads and saves those records directly from your browser. It has no application backend that receives or stores your business details, customers, invoices, PDFs or JPG images.</strong></p>
           <p>This does not mean the app never reads data: it needs to read your connected Sheet to display records, and write to it when you save.</p>
+          <p>Signature images are resized locally. Saving business details stores the encoded image in your Sheet, and saving an invoice includes its signature in that record. Your current signature is also remembered with business details and the working invoice on this device. Images are not uploaded to a separate image host or made public.</p>
 
           <h2>What Google access is used for</h2>
           <ul>

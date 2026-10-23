@@ -139,8 +139,10 @@ export function planSave(workbook, { id, revision, baseRevision, customerId, inv
   const snapshot = structuredClone(invoice);
   snapshot.status ||= 'unpaid';
   snapshot.design = normalizeDesign(snapshot.design);
+  const invoiceJson = JSON.stringify(snapshot);
+  if (invoiceJson.length > 50000) throw new SheetsError('This invoice is too large for one Sheet record. Shorten the item descriptions or notes, or use a smaller signature image.', 'validation');
   const requests = [writeRow(workbook.tabs.Customers, [nextCustomerId, snapshot.customer.name.trim(), snapshot.customer.phone.trim(), snapshot.customer.address.trim(), savedAt], index < 0 ? null : index + 1),
-    writeRow(workbook.tabs.Invoices, [id, revision, savedAt, snapshot.number, snapshot.date, nextCustomerId, snapshot.customer.name.trim(), invoiceTotal(snapshot), `[${snapshot.status.toUpperCase()}] ${snapshot.items.map(item => item.description).join('; ')}`, JSON.stringify(snapshot)])];
+    writeRow(workbook.tabs.Invoices, [id, revision, savedAt, snapshot.number, snapshot.date, nextCustomerId, snapshot.customer.name.trim(), invoiceTotal(snapshot), `[${snapshot.status.toUpperCase()}] ${snapshot.items.map(item => item.description).join('; ')}`, invoiceJson])];
   requests.push({ appendCells: { sheetId: workbook.tabs['Invoice items'], fields: 'userEnteredValue', rows: snapshot.items.map((item, index) => row([id, revision, index + 1, item.description, Number(item.quantity), lineTotal({ ...item, quantity: '1' }), lineTotal(item)])) } });
   return { requests, customerId: nextCustomerId };
 }

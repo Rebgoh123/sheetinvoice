@@ -1,4 +1,5 @@
 import { normalizeDesign } from './invoice-design.mjs';
+import { MAX_SIGNATURE_LENGTH, normalizeSignatureImage } from './invoice-signature.mjs';
 
 export const MAX_ITEMS = 40;
 // One definition for the form, readable Sheet settings and stored invoice profiles.
@@ -13,6 +14,8 @@ export const SELLER_FIELDS = {
   registration: { label: 'Registration number', sheetKey: 'UEN / registration', id: 'seller-registration', limit: 80 },
   payment: { label: 'Payment instructions', id: 'seller-payment', limit: 800 },
   terms: { label: 'Invoice footer', id: 'seller-terms', limit: 240 },
+  signature: { label: 'Authorised signature', id: 'seller-signature', limit: 60 },
+  signatureImage: { label: 'Signature image', id: 'seller-signature-image', limit: MAX_SIGNATURE_LENGTH, isImage: true },
   reviewUrl: { label: 'Review link (optional)', sheetKey: 'Review link', id: 'seller-review-url', limit: 1000 },
 };
 export const defaultSeller = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.default ?? '']));
@@ -20,6 +23,7 @@ export const sellerLimits = Object.fromEntries(Object.entries(SELLER_FIELDS).map
 export function normalizeSeller(source) {
   return Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => {
     const value = typeof source?.[key] === 'string' ? source[key] : field.default ?? '';
+    if (field.isImage) return [key, normalizeSignatureImage(value)];
     return [key, (field.isLabel ? value.replace(/\s+/g, ' ').trim() : value).slice(0, field.limit)];
   }));
 }
@@ -39,6 +43,7 @@ export function validateSeller(seller) {
   for (const [key, limit] of Object.entries(sellerLimits)) {
     if (typeof seller?.[key] !== 'string' || seller[key].length > limit) errors.push(`${SELLER_FIELDS[key].label} is too long or invalid.`);
   }
+  if (seller?.signatureImage && !normalizeSignatureImage(seller.signatureImage)) errors.push('Upload a valid signature image in Settings.');
   if (seller?.reviewUrl?.trim()) {
     try {
       const link = new URL(seller.reviewUrl.trim());

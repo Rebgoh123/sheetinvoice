@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { formatMoney, invoiceTotal, lineTotal, priceInCents, validateInvoice, displayDate, sellerHeaderLines } from "./invoice.mjs";
 import { normalizeDesign } from './invoice-design.mjs';
+import { loadSignatureImage } from './invoice-signature.mjs';
 
 const W = 595.28, H = 841.89, M = 32, ROW = 22;
 const COL = [M, 58, 352, 412, 472, W - M];
@@ -23,6 +24,7 @@ async function renderInvoice(invoice, asJpg) {
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const serif = await pdf.embedFont(StandardFonts.TimesRomanBold);
   const italic = await pdf.embedFont(StandardFonts.HelveticaOblique);
+  const signatureImage = invoice.seller.signatureImage ? await pdf.embedPng(invoice.seller.signatureImage) : null;
   pdf.setTitle(`Invoice ${invoice.number}`);
   pdf.setAuthor(invoice.seller.name);
   pdf.setSubject(`Invoice for ${invoice.customer.name}`);
@@ -89,7 +91,9 @@ async function renderInvoice(invoice, asJpg) {
   // Fixed letterhead/footer fields are paragraphs; blank lines must not consume the page.
   const paragraph = text => text.replace(/\s+/g, ' ').trim();
   const terms = invoice.seller.terms.trim() ? wrap(paragraph(invoice.seller.terms), W - 2 * M, 8, italic) : [];
-  const bodyLimit = Math.min(H - 143, H - 124 - terms.length * 11);
+  const signature = paragraph(invoice.seller.signature);
+  const signatureSpace = signatureImage ? 48 : signature ? 28 : 0;
+  const bodyLimit = Math.min(H - 143, H - 124 - terms.length * 11) - signatureSpace;
 
   async function letterhead() {
     const headingWidth = W - 2 * M;
@@ -191,6 +195,18 @@ async function renderInvoice(invoice, asJpg) {
       const signatureTop = H - 68;
       rule(M, signatureTop, M + 220, signatureTop);
       rule(W - M - 220, signatureTop, W - M, signatureTop);
+      if (signatureImage) {
+        const scale = Math.min(204 / signatureImage.width, 44 / signatureImage.height);
+        const width = signatureImage.width * scale, height = signatureImage.height * scale;
+        const x = W - M - 110 - width / 2, top = signatureTop - 8 - height;
+        if (asJpg) page.push({ image: invoice.seller.signatureImage, x, top, width, height });
+        else page.drawImage(signatureImage, { x, y: H - top - height, width, height });
+      } else if (signature) {
+        const size = fit(signature, 204, 18, italic, 9), lines = wrap(signature, 204, size, italic);
+        for (const [lineIndex, text] of lines.entries()) {
+          await draw(text, W - M - 110, signatureTop - 8 - (lines.length - lineIndex) * (size + 2), size, italic, ink, 'center');
+        }
+      }
       await draw("RECEIVED BY", M + 110, signatureTop + 7, 8.8, regular, accent, "center");
       await draw("AUTHORISED SIGNATURE", W - M - 110, signatureTop + 7, 9, regular, accent, "center");
     } else await draw("Continued on next page", W - M, bottom + 10, 9, regular, accent, "right");
@@ -217,6 +233,8 @@ async function renderInvoice(invoice, asJpg) {
           context.fillStyle = cssColor(color);
           context.textBaseline = standard ? 'alphabetic' : 'top';
           context.fillText(text, x, standard ? top + size : top);
+        } else if (Object.hasOwn(command, 'image')) {
+          context.drawImage(await loadSignatureImage(command.image), command.x, command.top, command.width, command.height);
         } else {
           context.strokeStyle = cssColor(grid); context.lineWidth = command.thickness;
           context.beginPath(); context.moveTo(command.x1, command.top1); context.lineTo(command.x2, command.top2); context.stroke();

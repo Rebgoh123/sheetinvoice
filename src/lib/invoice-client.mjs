@@ -5,6 +5,7 @@ import {
 } from "./invoice.mjs";
 import { InvoiceSheets, SAVED_ITEMS_TAB, DESIGN_TAB } from './invoice-sheets.mjs';
 import { normalizeDesign } from './invoice-design.mjs';
+import { prepareSignatureImage } from './invoice-signature.mjs';
 import { prepareGoogle, preparePicker, chooseSheet } from './invoice-google.mjs';
 import { loadDevice, saveDevice, forgetDevice, FORGET_KEY, loadGoogleSession, saveGoogleSession, clearGoogleSession } from './invoice-storage.mjs';
 
@@ -18,9 +19,10 @@ let invoice = remembered?.invoice || newInvoice();
 let automaticNumber = remembered ? remembered.automaticNumber : invoice.number;
 let numberStart = remembered?.numberStart || '';
 let business = remembered?.business || normalizeSeller(), profileDirty = remembered?.profileDirty || false;
+let signatureBusy = false, signatureUpload = 0;
 let cachedItems = remembered?.savedItems || [], cachedDesign = remembered?.design || normalizeDesign(), cacheAccountId = remembered?.accountId || null, deviceSaved = false;
 if (!invoice.items.length) invoice.items.push({ description: "", quantity: "1", price: "" });
-let generated = null, objectUrls = [], exportPage = 0, revision = 0, generating = false, sharing = false;
+let generated = null, objectUrls = [], previewUrls = [], exportPage = 0, revision = 0, generating = false, sharing = false;
 let exportFormat = remembered?.exportFormat || 'pdf';
 $('export-format').value = exportFormat;
 let sheets = null, workbook = null, googleUser = null, tokenClient = null, googleBusy = false, pickerReady = false, googleLoadFailed = false;
@@ -41,9 +43,18 @@ const fields = {
 };
 const sellerFields = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.id]));
 function fillBusinessForm() {
+  signatureUpload++; signatureBusy = false;
   for (const [key, id] of Object.entries(sellerFields)) $(id).value = business[key];
+  $('signature-upload').value = ''; $('signature-status').textContent = ''; $('signature-error').hidden = true;
+  renderSignature();
   $('invoice-number-start').value = numberStart;
   updateNumberingWarning();
+}
+function renderSignature() {
+  $('signature-preview').hidden = !business.signatureImage;
+  $('remove-signature').hidden = !business.signatureImage;
+  if (business.signatureImage) $('signature-preview').src = business.signatureImage;
+  else $('signature-preview').removeAttribute('src');
 }
 function readBusinessForm() {
   business = normalizeSeller(Object.fromEntries(Object.entries(sellerFields).map(([key, id]) => [key, $(id).value])));
@@ -67,6 +78,7 @@ function applyNumbering(next) {
 }
 function resetBusinessProfile() { business = normalizeSeller(); numberStart = ''; profileDirty = false; fillBusinessForm(); }
 function businessChanged(event) {
+  if (event.target.id === 'signature-upload') return;
   readBusinessForm(); profileDirty = true;
   if (event.target.id !== 'invoice-number-start') {
     invoice.seller = { ...business }; revision++; recordRevision = crypto.randomUUID(); dirty = true;
@@ -148,22 +160,27 @@ function errors(messages = []) {
   box.append(list); box.focus();
 }
 function clearExportUrls() {
-  for (const url of objectUrls) URL.revokeObjectURL(url);
-  objectUrls = []; $('invoice-image').removeAttribute('src');
+  for (const url of new Set([...objectUrls, ...previewUrls])) URL.revokeObjectURL(url);
+  objectUrls = []; previewUrls = []; $('invoice-image').removeAttribute('src');
+}
+function createExportUrls() {
+  clearExportUrls();
+  objectUrls = generated.files.map(file => URL.createObjectURL(file));
+  previewUrls = generated.format === 'jpg' ? objectUrls : generated.previews.map(blob => URL.createObjectURL(blob));
 }
 function showExportPage(index = 0) {
   if (!generated) return;
-  exportPage = Math.max(0, Math.min(index, generated.files.length - 1));
-  const file = generated.files[exportPage], url = objectUrls[exportPage], image = generated.format === 'jpg';
+  const pages = generated.previews.length, image = generated.format === 'jpg';
+  exportPage = Math.max(0, Math.min(index, pages - 1));
+  const file = generated.files[image ? exportPage : 0], url = objectUrls[image ? exportPage : 0];
   $('download-pdf').href = url; $('download-pdf').download = file.name;
   $('download-pdf').querySelector('span').textContent = generated.files.length > 1 ? `Save page ${exportPage + 1} as JPG` : `Save as ${generated.format.toUpperCase()}`;
-  $('view-pdf').href = url; $('view-pdf').querySelector('span').textContent = image ? 'View JPG' : 'View PDF';
   $('result-filename').textContent = file.name;
-  $('invoice-image').hidden = !image;
-  if (image) { $('invoice-image').src = url; $('invoice-image').alt = `Invoice ${generated.invoice.number}, page ${exportPage + 1} of ${generated.files.length}`; }
-  $('image-page-controls').hidden = !image || generated.files.length < 2;
-  $('image-page').textContent = `Page ${exportPage + 1} of ${generated.files.length}`;
-  $('image-previous').disabled = exportPage === 0; $('image-next').disabled = exportPage === generated.files.length - 1;
+  $('invoice-image').hidden = !pages; $('preview-unavailable').hidden = !!pages;
+  if (pages) { $('invoice-image').src = previewUrls[exportPage]; $('invoice-image').alt = `Invoice ${generated.invoice.number}, page ${exportPage + 1} of ${pages}`; }
+  $('image-page-controls').hidden = pages < 2;
+  $('image-page').textContent = `Page ${exportPage + 1} of ${pages}`;
+  $('image-previous').disabled = exportPage === 0; $('image-next').disabled = exportPage >= pages - 1;
 }
 function discardExport() {
   const returnView = generated?.record ? 'history' : 'invoice';
@@ -172,7 +189,7 @@ function discardExport() {
   $('invoice-image').hidden = true; $('image-page-controls').hidden = true;
   $("pdf-result").hidden = true;
   $("share-status").textContent = "";
-  for (const id of ["view-pdf", "download-pdf", "open-whatsapp"]) $(id).removeAttribute("href");
+  for (const id of ["download-pdf", "open-whatsapp"]) $(id).removeAttribute("href");
   $("whatsapp-summary").value = "";
   $('sheet-save-status').textContent = '';
   $('invoice-save-status').textContent = '';
@@ -181,16 +198,21 @@ function discardExport() {
   if (activeView === 'pdf') showView(returnView, false);
   if (!generating) $("generate-pdf").querySelector("span").textContent = exportLabel();
 }
-async function invoiceFiles(snapshot, format) {
+async function invoiceFiles(snapshot, format, cachedPreviews) {
   const { generateInvoicePdf, generateInvoiceJpg } = await import('./invoice-export.mjs');
-  const blobs = format === 'jpg' ? await generateInvoiceJpg(snapshot) : [new Blob([await generateInvoicePdf(snapshot)], { type: 'application/pdf' })];
-  return blobs.map((blob, index) => new File([blob], invoiceFilename(snapshot, format, blobs.length > 1 ? index + 1 : null), { type: blob.type }));
+  let previews = cachedPreviews?.length ? cachedPreviews : null;
+  if (!previews) {
+    try { previews = await generateInvoiceJpg(snapshot); }
+    catch (error) { if (format === 'jpg') throw error; previews = []; }
+  }
+  const blobs = format === 'jpg' ? previews : [new Blob([await generateInvoicePdf(snapshot)], { type: 'application/pdf' })];
+  const files = blobs.map((blob, index) => new File([blob], invoiceFilename(snapshot, format, blobs.length > 1 ? index + 1 : null), { type: blob.type }));
+  return { files, previews };
 }
 function displayExport(result) {
-  clearExportUrls();
   generated = result;
-  const { files, format, invoice: snapshot, record, savedToSheet } = result, formatLabel = format.toUpperCase();
-  objectUrls = files.map(file => URL.createObjectURL(file));
+  const { files, previews, format, invoice: snapshot, record, savedToSheet } = result, formatLabel = format.toUpperCase();
+  createExportUrls();
   showExportPage();
   $('result-heading').textContent = record ? `Invoice ${snapshot.number}` : 'Invoice ready';
   $('result-back').textContent = record ? 'Back to transactions' : 'Back to invoice';
@@ -199,7 +221,7 @@ function displayExport(result) {
   document.querySelectorAll('[data-export-format]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.exportFormat === format)));
   $('whatsapp-summary').value = invoiceSummary(snapshot);
   $('open-whatsapp').href = whatsappUrl(snapshot);
-  $('result-description').textContent = `${snapshot.customer.name.trim()} · ${displayDate(snapshot.date)} · ${formatMoney(invoiceTotal(snapshot))} · ${(files.reduce((size, file) => size + file.size, 0) / 1024).toFixed(0)} KB · ${files.length > 1 ? `${files.length} JPG pages` : formatLabel}`;
+  $('result-description').textContent = `${snapshot.customer.name.trim()} · ${displayDate(snapshot.date)} · ${formatMoney(invoiceTotal(snapshot))} · ${(files.reduce((size, file) => size + file.size, 0) / 1024).toFixed(0)} KB · ${formatLabel}${previews.length > 1 ? ` · ${previews.length} pages` : ''}`;
   $('result-payment-status').textContent = snapshot.status === 'paid' ? 'Paid' : 'Unpaid';
   $('result-payment-status').className = `iv-small-badge iv-badge-${snapshot.status}`;
   $('sheet-save-status').textContent = record ? '' : savedToSheet ? 'Saved to your Google Sheet.' : `${formatLabel} only. This invoice has not been saved to Google Sheets.`;
@@ -301,6 +323,32 @@ form.addEventListener("input", changed);
 form.addEventListener("change", changed);
 $('business-form').addEventListener('input', businessChanged);
 $('business-form').addEventListener('change', businessChanged);
+$('upload-signature').addEventListener('click', () => $('signature-upload').click());
+$('signature-upload').addEventListener('change', async () => {
+  const input = $('signature-upload'), file = input.files[0];
+  if (!file || signatureBusy || generating || googleBusy) return;
+  const request = ++signatureUpload, epoch = connectionEpoch;
+  signatureBusy = true; updateCloudControls(); $('signature-error').hidden = true;
+  $('signature-status').textContent = 'Preparing image…';
+  try {
+    const image = await prepareSignatureImage(file);
+    if (request !== signatureUpload || epoch !== connectionEpoch) return;
+    $('seller-signature-image').value = image;
+    businessChanged({ target: $('seller-signature-image') }); renderSignature();
+    $('signature-status').textContent = workbook ? 'Image ready. Save business details to keep it in your Sheet.' : 'Image remembered on this device. Connect a Sheet to save it there.';
+  } catch (error) {
+    if (request !== signatureUpload || epoch !== connectionEpoch) return;
+    $('signature-status').textContent = ''; $('signature-error').textContent = error.message; $('signature-error').hidden = false;
+  } finally {
+    if (request === signatureUpload) { signatureBusy = false; input.value = ''; updateCloudControls(); }
+  }
+});
+$('remove-signature').addEventListener('click', () => {
+  if (signatureBusy || generating || googleBusy) return;
+  $('seller-signature-image').value = '';
+  businessChanged({ target: $('seller-signature-image') }); renderSignature();
+  $('signature-error').hidden = true; $('signature-status').textContent = 'Image removed. Save business details to update your Sheet. Initials will be used if filled in.';
+});
 $("add-item").addEventListener("click", () => {
   readForm(); if (invoice.items.length >= MAX_ITEMS) return;
   invoice.items.push({ description: "", quantity: "1", price: "" });
@@ -325,7 +373,7 @@ function addSavedItem(selected) {
   $('quick-add-status').textContent = `${item.description} added. Quantity ${invoice.items[index].quantity}. Total ${formatMoney(invoiceTotal(invoice))}.`;
 }
 async function completeInvoice({ exportFile = true } = {}) {
-  if (generating || (googleBusy && sheets)) return;
+  if (generating || signatureBusy || (googleBusy && sheets)) return;
   $('google-error').hidden = true;
   if (!exportFile && !workbook) return;
   readForm(); errors();
@@ -361,10 +409,10 @@ async function completeInvoice({ exportFile = true } = {}) {
       persist(); return;
     }
     button.querySelector('span').textContent = `Creating ${formatLabel}…`;
-    const files = await invoiceFiles(snapshot, format);
+    const output = await invoiceFiles(snapshot, format);
     if (epoch !== connectionEpoch) return;
     if (version !== revision) { errors([savedToSheet ? `Earlier details saved. Choose Save & ${formatLabel} again for your latest edits.` : `The details changed. Generate the ${formatLabel} again.`]); return; }
-    displayExport({ files, format, invoice: snapshot, savedToSheet });
+    displayExport({ ...output, format, invoice: snapshot, savedToSheet });
     showView('pdf');
     persist();
   } catch (error) {
@@ -394,9 +442,9 @@ async function changeExportFormat(format) {
   $('result-format-status').textContent = `Creating ${format.toUpperCase()}…`;
   try {
     // Switching file format only renders the snapshot; it never saves or edits a Sheet record.
-    const files = await invoiceFiles(source.invoice, format);
+    const output = await invoiceFiles(source.invoice, format, source.previews);
     if (epoch !== connectionEpoch || generated !== source) return;
-    displayExport({ ...source, files, format });
+    displayExport({ ...source, ...output, format });
     exportFormat = format; $('export-format').value = format;
   } catch {
     if (epoch !== connectionEpoch || generated !== source) return;
@@ -481,7 +529,7 @@ $("clear-device").addEventListener("click", () => {
 });
 window.addEventListener("pagehide", () => { readForm(); persist(); clearExportUrls(); });
 window.addEventListener("pageshow", (event) => { if (event.persisted && generated) {
-  objectUrls = generated.files.map(file => URL.createObjectURL(file)); showExportPage(exportPage);
+  createExportUrls(); showExportPage(exportPage);
 } });
 window.addEventListener('storage', event => {
   if (event.key === FORGET_KEY || event.key === null) { forgetMarker = stored(FORGET_KEY); disconnectAndClear(false); }
@@ -523,18 +571,20 @@ function updateCloudControls() {
     button.textContent = connectLabel;
   }
   for (const id of ['create-sheet', 'refresh-sheet', 'change-sheet', 'save-business-defaults', 'setup-saved-items', 'setup-design', 'apply-design', 'disconnect-google']) $(id).disabled = googleBusy || generating;
+  $('save-business-defaults').disabled ||= signatureBusy;
+  for (const id of ['upload-signature', 'remove-signature']) $(id).disabled = signatureBusy || generating || googleBusy;
   $('save-business-defaults').textContent = workbook?.seller.name.trim() ? 'Save business details' : 'Save & start invoicing';
   $('apply-design').hidden = !workbook || JSON.stringify(normalizeDesign(invoice.design)) === JSON.stringify(workbook.design);
   updateSavedItemControl();
   $('choose-sheet').disabled = !pickerReady || !sheets || googleBusy || generating;
   $('use-existing-sheet').disabled = !sheets || !$('existing-sheet').value || googleBusy || generating;
-  $('generate-pdf').disabled = generating || (googleBusy && !!sheets);
+  $('generate-pdf').disabled = generating || signatureBusy || (googleBusy && !!sheets);
   $('export-format').disabled = generating || sharing;
   for (const button of document.querySelectorAll('[data-export-format]')) button.disabled = googleBusy || generating || sharing;
   $('edit-invoice').disabled = googleBusy || generating || sharing;
   $('share-pdf').disabled = generating || sharing;
   if (!generating) $('generate-pdf').querySelector('span').textContent = exportLabel();
-  $('save-invoice').disabled = generating || googleBusy || !workbook || !sheets;
+  $('save-invoice').disabled = generating || signatureBusy || googleBusy || !workbook || !sheets;
   $('history-customer').disabled = !workbook || googleBusy || generating;
   document.querySelectorAll('[data-status]').forEach(button => button.disabled = !workbook || googleBusy || generating);
   for (const button of $('history-list').querySelectorAll('button')) button.disabled = googleBusy || generating;
@@ -566,7 +616,7 @@ function cloudError(error, { quiet = false, focus = true } = {}) {
   if (!quiet && focus) { $('google-error').focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
 }
 async function cloudAction(action) {
-  if (googleBusy || generating) return;
+  if (googleBusy || generating || signatureBusy) return;
   googleBusy = true; $('google-error').hidden = true; updateCloudControls();
   try { await action(); } catch (error) { cloudError(error); }
   finally { googleBusy = false; updateCloudControls(); persist(); }
@@ -638,9 +688,9 @@ async function openRecord(record) {
   $('google-error').hidden = true;
   $('history-feedback').textContent = `Opening invoice ${snapshot.number}…`; $('history-feedback').hidden = false;
   try {
-    const files = await invoiceFiles(snapshot, format);
+    const output = await invoiceFiles(snapshot, format);
     if (epoch !== connectionEpoch || activeView !== 'history') return;
-    displayExport({ files, format, invoice: snapshot, record: structuredClone(record), savedToSheet: true });
+    displayExport({ ...output, format, invoice: snapshot, record: structuredClone(record), savedToSheet: true });
     showView('pdf');
   } catch {
     if (epoch !== connectionEpoch) return;
