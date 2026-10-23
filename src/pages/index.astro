@@ -45,9 +45,10 @@ const googleConfig = {
             <div id="connect-hint" class="connect-hint"><span id="connect-hint-text">Keep your invoices in your own Sheet.</span><button class="iv-button iv-primary" type="button" data-connect-sheet disabled>Connect Google Sheet</button></div>
             <div id="error-box" class="notice" role="alert" tabindex="-1" hidden></div>
             <form id="invoice-form">
+              <div id="customer-mode" class="iv-status-filters iv-customer-mode" role="group" aria-label="Customer source" hidden><button type="button" data-customer-mode="saved" aria-pressed="false">Saved customer</button><button type="button" data-customer-mode="new" aria-pressed="true">New customer</button></div>
               <div class="iv-customer-grid">
                 <div>
-                  <div class="iv-label-row"><label id="customer-label" for="customer-name">Customer</label><button id="new-customer" class="iv-text-button" type="button" hidden>+ New customer</button></div>
+                  <label id="customer-label" for="customer-name">Customer name</label>
                   <div id="saved-customer-field" hidden><select id="saved-customer" name="savedCustomer" aria-labelledby="customer-label"><option value="">Choose a customer</option></select></div>
                   <div id="customer-name-field"><input id="customer-name" name="customerName" autocomplete="section-customer name" placeholder="Customer name" required maxlength="120" aria-labelledby="customer-label" /></div>
                 </div>
@@ -113,6 +114,7 @@ const googleConfig = {
                 <div class="iv-field"><label for="seller-address">{SELLER_FIELDS.address.label}</label><textarea id="seller-address" name="sellerAddress" rows="2" maxlength={SELLER_FIELDS.address.limit}></textarea></div>
                 <div class="iv-meta-grid iv-field"><div><label for="seller-phone-label">{SELLER_FIELDS.phoneLabel.label}</label><input id="seller-phone-label" name="sellerPhoneLabel" maxlength={SELLER_FIELDS.phoneLabel.limit} placeholder="Contact, Tel or WhatsApp" /></div><div><label for="seller-phone">{SELLER_FIELDS.phone.label}</label><input id="seller-phone" name="sellerPhone" type="tel" maxlength={SELLER_FIELDS.phone.limit} /></div></div>
                 <div class="iv-field"><label for="seller-payment">{SELLER_FIELDS.payment.label}</label><textarea id="seller-payment" name="sellerPayment" rows="2" maxlength={SELLER_FIELDS.payment.limit} placeholder="PayNow number and account name"></textarea></div>
+                <div class="iv-field"><label for="seller-message-prefix">{SELLER_FIELDS.messagePrefix.label}</label><textarea id="seller-message-prefix" name="sellerMessagePrefix" rows="3" maxlength={SELLER_FIELDS.messagePrefix.limit} aria-describedby="message-prefix-help" placeholder="Thanks for choosing us. Here’s your invoice."></textarea><p id="message-prefix-help" class="field-help">Added above the greeting and invoice details when sharing. Leave blank to use the standard message.</p></div>
                 <details class="iv-notes"><summary>More business details</summary>
                 <div class="iv-field"><label for="invoice-number-start">Start invoice numbers at</label><input id="invoice-number-start" name="invoiceNumberStart" maxlength="70" placeholder="e.g. 40108 or INV-0001" aria-describedby="numbering-help" /><p id="numbering-help" class="field-help">New invoices continue after the highest saved number in this series. Leave blank for automatic date-based numbers.</p><p id="numbering-warning" class="field-help" role="status" hidden></p></div>
                 <div class="iv-meta-grid"><div><label for="seller-contact">{SELLER_FIELDS.contact.label}</label><input id="seller-contact" name="sellerContact" maxlength={SELLER_FIELDS.contact.limit} /></div><div><label for="seller-email">{SELLER_FIELDS.email.label}</label><input id="seller-email" name="sellerEmail" type="email" maxlength={SELLER_FIELDS.email.limit} /></div></div>

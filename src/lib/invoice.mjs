@@ -16,6 +16,7 @@ export const SELLER_FIELDS = {
   terms: { label: 'Invoice footer', id: 'seller-terms', limit: 240 },
   signature: { label: 'Authorised signature', id: 'seller-signature', limit: 60 },
   signatureImage: { label: 'Signature image', id: 'seller-signature-image', limit: MAX_SIGNATURE_LENGTH, isImage: true },
+  messagePrefix: { label: 'WhatsApp message prefix (optional)', sheetKey: 'WhatsApp message prefix', id: 'seller-message-prefix', limit: 1000 },
   reviewUrl: { label: 'Review link (optional)', sheetKey: 'Review link', id: 'seller-review-url', limit: 1000 },
 };
 export const defaultSeller = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.default ?? '']));
@@ -151,6 +152,7 @@ export function validateInvoice(invoice) {
 
 export function invoiceSummary(invoice) {
   return [
+    ...(invoice.seller.messagePrefix?.trim() ? [invoice.seller.messagePrefix.trim(), ''] : []),
     `Hi ${invoice.customer.name.trim()},`, "",
     `Invoice ${invoice.number} | ${displayDate(invoice.date)}`,
     ...invoice.items.map((item) => `${item.description.trim()}${Number(item.quantity) > 1 ? ` x ${item.quantity}` : ""}: ${formatMoney(lineTotal(item))}`),

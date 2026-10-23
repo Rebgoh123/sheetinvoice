@@ -31,9 +31,6 @@ body { margin:0; }
   .invoice-app input::placeholder,.invoice-app textarea::placeholder { color:var(--iv-muted); }
   .invoice-app input[type=date] { -webkit-appearance:none; }
   .invoice-app .iv-customer-grid { display:grid; grid-template-columns:1.3fr 1fr; gap:18px; }
-  .invoice-app .iv-label-row { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:25px; }
-  .invoice-app .iv-label-row label { margin-bottom:7px; }
-  .invoice-app .iv-label-row button { font-size:11px; min-height:24px; padding:0 0 7px; }
   .invoice-app .iv-customer-grid>div:last-child>label { padding-top:0; min-height:18px; }
   .invoice-app .iv-meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:17px; max-width:440px; }
   .invoice-app .iv-items { margin-top:26px; padding-top:23px; border-top:1px solid var(--iv-line); }
@@ -80,6 +77,8 @@ body { margin:0; }
   .invoice-app .iv-status-filters { display:flex; align-items:center; padding:3px; border:1px solid var(--iv-line); border-radius:6px; background:var(--iv-soft); min-height:43px; }
   .invoice-app .iv-status-filters button { border:0; border-radius:4px; padding:7px 15px; min-height:35px; background:transparent; color:var(--iv-muted); font-size:12px; }
   .invoice-app .iv-status-filters button[aria-pressed=true] { background:var(--iv-surface); color:var(--iv-text); box-shadow:0 1px 3px #183b2712; }
+  .invoice-app .iv-customer-mode { width:fit-content; max-width:100%; margin-bottom:16px; }
+  .invoice-app .iv-customer-mode button { min-height:44px; padding-inline:12px; white-space:nowrap; }
   .invoice-app .iv-history-summary { margin:24px 0 14px; color:var(--iv-muted); font-size:12px; }
   .invoice-app .iv-history-head,.invoice-app .iv-history-row { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1.4fr) 85px 66px 180px; gap:12px; align-items:center; }
   .invoice-app .iv-history-head { padding-bottom:11px; color:var(--iv-muted); font-size:11px; }
@@ -96,6 +95,8 @@ body { margin:0; }
   .invoice-app .iv-history-icon { width:44px; min-width:44px; justify-content:center; border-radius:5px; }
   .invoice-app .iv-history-icon svg { width:17px; height:17px; }
   .invoice-app .iv-history-icon:hover { background:var(--iv-soft); }
+  .invoice-app .iv-history-pay { justify-content:center; padding-inline:6px; border-radius:5px; background:var(--iv-paid-bg); color:var(--iv-paid-text); }
+  .invoice-app .iv-history-pay:not(:disabled):is(:hover,:focus-visible) { background:var(--iv-paid-text); color:white; }
   .invoice-app .iv-row-open { position:absolute; inset:0; z-index:0; width:100%; border:0; border-radius:5px; padding:0; background:transparent; cursor:pointer; }
   .invoice-app .iv-row-open:focus-visible { outline:2px solid var(--iv-accent); outline-offset:2px; }
   .invoice-app .iv-history-row:has(.iv-row-open:hover) { background:var(--iv-soft); }
@@ -158,10 +159,9 @@ body { margin:0; }
     .invoice-app .iv-meta-grid { gap:10px; }
     .invoice-app input:not([type=checkbox]),.invoice-app select,.invoice-app textarea { font-size:16px; min-height:44px; }
     .invoice-app .iv-text-button,.invoice-app .iv-notes summary { min-height:44px; }
-    .invoice-app .iv-label-row button { min-height:44px; padding-bottom:0; }
     .invoice-app .iv-button { min-height:44px; }
     .invoice-app .iv-history-filters { display:grid; grid-template-columns:1fr; gap:15px; }
-    .invoice-app .iv-status-filters button { flex:1; min-height:38px; }
+    .invoice-app .iv-status-filters button { flex:1; min-height:44px; }
   }
 
 .invoice-app a { color:var(--iv-accent); text-decoration:none; }
@@ -224,8 +224,6 @@ body { margin:0; }
 .invoice-app #whatsapp-summary { margin-top:12px; }
 @container (max-width:650px) { .invoice-app .line-total>span { display:block; font-size:11px; margin-bottom:7px; } }
 @container (max-width:480px) {
-  .invoice-app .iv-panel { padding:20px 16px; }
-  .invoice-app .iv-history-actions button { min-height:44px; }
   .invoice-app .sheet-create>div,.invoice-app .sheet-existing>div { flex-basis:100%; min-width:0; }
   .invoice-app .sheet-create .iv-button,.invoice-app .sheet-existing .iv-button { width:100%; }
   .invoice-app .iv-export-toolbar .pdf-actions { width:100%; margin-left:0; }

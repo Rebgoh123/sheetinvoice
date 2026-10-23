@@ -43,10 +43,9 @@ const sheetDesign = () => workbook?.design ?? cachedDesign;
 const fields = {
   "customer-name": ["customer", "name"], "customer-phone": ["customer", "phone"], "customer-address": ["customer", "address"],
 };
-const sellerFields = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.id]));
 function fillBusinessForm() {
   signatureUpload++; signatureBusy = false;
-  for (const [key, id] of Object.entries(sellerFields)) $(id).value = business[key];
+  for (const [key, field] of Object.entries(SELLER_FIELDS)) $(field.id).value = business[key];
   $('signature-upload').value = ''; $('signature-status').textContent = ''; $('signature-error').hidden = true;
   renderSignature();
   $('invoice-number-start').value = numberStart;
@@ -59,7 +58,7 @@ function renderSignature() {
   else $('signature-preview').removeAttribute('src');
 }
 function readBusinessForm() {
-  business = normalizeSeller(Object.fromEntries(Object.entries(sellerFields).map(([key, id]) => [key, $(id).value])));
+  business = normalizeSeller(Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, $(field.id).value])));
   numberStart = $('invoice-number-start').value.trim();
   updateNumberingWarning();
 }
@@ -118,8 +117,9 @@ function updateCustomerControls() {
   $('saved-customer-field').hidden = !saved; $('saved-customer').required = saved;
   $('customer-name-field').hidden = saved; $('customer-name').required = !saved;
   $('customer-label').htmlFor = saved ? 'saved-customer' : 'customer-name';
-  $('new-customer').hidden = !hasCustomers;
-  $('new-customer').textContent = saved ? '+ New customer' : 'Saved customers';
+  $('customer-label').textContent = saved ? 'Choose a customer' : 'Customer name';
+  $('customer-mode').hidden = !hasCustomers;
+  document.querySelectorAll('[data-customer-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.customerMode === customerMode)));
 }
 function fillForm() {
   for (const [id, [group, field]] of Object.entries(fields)) $(id).value = invoice[group][field];
@@ -247,6 +247,16 @@ async function refreshBusiness() {
   useWorkbook(next, { businessOnly: true });
 }
 const currentBusinessInvoice = snapshot => ({ ...structuredClone(snapshot), seller: normalizeSeller(business) });
+async function renderCurrentExport(source, epoch, format = source.format) {
+  if (epoch !== connectionEpoch || generated !== source) return false;
+  const snapshot = currentBusinessInvoice(source.invoice), profileChanged = differentBusiness(snapshot.seller, source.invoice.seller);
+  if (profileChanged || format !== source.format) {
+    const output = await invoiceFiles(snapshot, format, profileChanged ? null : source.previews);
+    if (epoch !== connectionEpoch || generated !== source) return false;
+    displayExport({ ...source, ...output, format, invoice: snapshot });
+  }
+  return true;
+}
 async function finishSettings() {
   if (generating || signatureBusy || googleBusy) return;
   if (previousView !== 'pdf' || !generated) { showView(previousView); return; }
@@ -254,14 +264,7 @@ async function finishSettings() {
   generating = true; updateCloudControls();
   try {
     await refreshBusiness();
-    if (epoch !== connectionEpoch || generated !== source) return;
-    const snapshot = currentBusinessInvoice(source.invoice);
-    if (differentBusiness(snapshot.seller, source.invoice.seller)) {
-      const output = await invoiceFiles(snapshot, source.format);
-      if (epoch !== connectionEpoch || generated !== source) return;
-      displayExport({ ...source, ...output, invoice: snapshot });
-    }
-    showView('pdf');
+    if (await renderCurrentExport(source, epoch)) showView('pdf');
   } catch (error) { if (epoch === connectionEpoch) cloudError(error); }
   finally { generating = false; updateCloudControls(); persist(); }
 }
@@ -487,11 +490,7 @@ async function changeExportFormat(format) {
   try {
     // Switching file format only renders the snapshot; it never saves or edits a Sheet record.
     await refreshBusiness();
-    if (epoch !== connectionEpoch || generated !== source) return;
-    const snapshot = currentBusinessInvoice(source.invoice);
-    const output = await invoiceFiles(snapshot, format, differentBusiness(snapshot.seller, source.invoice.seller) ? null : source.previews);
-    if (epoch !== connectionEpoch || generated !== source) return;
-    displayExport({ ...source, ...output, format, invoice: snapshot });
+    if (!await renderCurrentExport(source, epoch, format)) return;
     exportFormat = format; $('export-format').value = format;
   } catch (error) {
     if (epoch !== connectionEpoch || generated !== source) return;
@@ -514,13 +513,15 @@ document.addEventListener('invalid', event => {
   let details = event.target.closest('details');
   while (details) { details.open = true; details = details.parentElement.closest('details'); }
 }, true);
-$('new-customer').addEventListener('click', () => {
-  if (customerMode === 'saved') {
-    customerMode = 'new'; customerId = null; $('saved-customer').value = '';
+document.querySelectorAll('[data-customer-mode]').forEach(button => button.addEventListener('click', () => {
+  if (customerMode === button.dataset.customerMode) return;
+  customerMode = button.dataset.customerMode;
+  if (customerMode === 'new' && customerId) {
+    customerId = null; $('saved-customer').value = '';
     $('customer-name').value = ''; $('customer-phone').value = ''; changed();
-  } else customerMode = 'saved';
-  updateCustomerControls(); $('saved-customer-field').hidden ? $('customer-name').focus() : $('saved-customer').focus();
-});
+  }
+  updateCustomerControls();
+}));
 
 function supportsFileShare(files) {
   try { return !!(window.isSecureContext && navigator.share && navigator.canShare?.({ files })); } catch { return false; }
@@ -555,24 +556,23 @@ $("copy-summary").addEventListener("click", async () => {
     $("share-status").textContent = "Select and copy the summary above, then paste it into WhatsApp.";
   }
 });
-function startInvoice(selectedCustomer, { offerUndo = true, navigate = true } = {}) {
+function startInvoice(selectedCustomer, { offerUndo = true, navigate = true, focus = true } = {}) {
   let number;
   try { number = suggestedNumber(); } catch (error) { if (navigate) { errors([error.message]); return; } }
   readForm();
   resetUndo = offerUndo ? (dirty || baseRevision || (generated && !generated.record) ? structuredClone({ invoice, automaticNumber, recordId, recordRevision, baseRevision, customerId, dirty, recordWorkbookId, editReturnRecord }) : resetUndo) : null;
   editReturnRecord = null;
   $('history-feedback').textContent = ''; $('history-feedback').hidden = true;
-  const seller = { ...business };
-  revision++; recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); customerId = null; dirty = false; $('saved-customer').value = ''; discardExport(); errors(); invoice = newInvoice(seller, undefined, sheetDesign());
+  revision++; recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); customerId = null; dirty = false; $('saved-customer').value = ''; discardExport(); errors(); invoice = newInvoice(business, undefined, sheetDesign());
   if (number) invoice.number = number;
   automaticNumber = invoice.number; fillForm(); persist(); updateCloudControls();
   if (selectedCustomer) {
     const customer = workbook?.customers.find(customer => customer.id === selectedCustomer);
     if (customer) { customerId = customer.id; invoice.customer = { name: customer.name, phone: customer.phone, address: customer.address }; fillForm(); renderCloudRecords(); persist(); }
   }
-  if (navigate) { showView('invoice'); $('saved-customer-field').hidden ? $('customer-name').focus() : $('saved-customer').focus(); }
+  if (navigate) showView('invoice', focus);
 }
-$('new-invoice').addEventListener('click', () => startInvoice());
+$('new-invoice').addEventListener('click', () => startInvoice(undefined, { focus: false }));
 $('undo-reset').addEventListener('click', () => {
   if (!resetUndo || googleBusy || generating) return;
   ({ invoice, automaticNumber, recordId, recordRevision, baseRevision, customerId, dirty, recordWorkbookId, editReturnRecord } = resetUndo);
@@ -659,7 +659,7 @@ function updateCloudControls() {
   for (const button of $('history-list').querySelectorAll('button')) button.disabled = googleBusy || generating;
   $('history-previous').disabled = googleBusy || generating || historyPage === 0;
   $('history-next').disabled = googleBusy || generating || historyPage >= Math.ceil(filteredHistory().length / 10) - 1;
-  for (const id of ['new-invoice', 'history-new-invoice', 'new-customer', 'clear-device', 'saved-customer']) $(id).disabled = (googleBusy && !!sheets) || generating;
+  for (const control of [$('new-invoice'), $('history-new-invoice'), $('clear-device'), $('saved-customer'), ...document.querySelectorAll('[data-customer-mode]')]) control.disabled = (googleBusy && !!sheets) || generating;
   $('connection-label').textContent = workbook ? 'Sheet connected' : restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : sheets ? 'Choose a Sheet' : requiresSheetSave ? 'Reconnect Sheet' : 'Not connected';
   $('connection-status').dataset.connected = String(!!workbook);
   $('connect-hint').hidden = !!workbook;
@@ -748,7 +748,7 @@ function renderHistory() {
     const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'iv-text-button iv-history-icon'; edit.append($('history-edit-icon').content.cloneNode(true)); edit.title = `Edit invoice ${saved.number}`; edit.setAttribute('aria-label', `Edit invoice ${saved.number}`);
     edit.addEventListener('click', () => openRecord(record, { edit: true })); actions.append(edit);
     if (!paid) {
-      const pay = document.createElement('button'); pay.type = 'button'; pay.className = 'iv-text-button'; pay.textContent = 'Mark paid'; pay.setAttribute('aria-label', `Mark invoice ${saved.number} paid`);
+      const pay = document.createElement('button'); pay.type = 'button'; pay.className = 'iv-text-button iv-history-pay'; pay.textContent = 'Mark paid'; pay.setAttribute('aria-label', `Mark invoice ${saved.number} paid`);
       pay.addEventListener('click', () => markRecordPaid(record)); actions.append(pay);
     }
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'iv-text-button iv-danger-text iv-history-icon'; remove.append($('history-delete-icon').content.cloneNode(true)); remove.title = `Delete invoice ${saved.number}`; remove.setAttribute('aria-label', `Delete invoice ${saved.number}`);
@@ -1041,10 +1041,8 @@ window.addEventListener('focus', async () => {
     useWorkbook(next, { businessOnly: true, render: false });
     if (source && generated === source && activeView === 'pdf' && differentBusiness(source.invoice.seller, business)) {
       generating = true; updateCloudControls();
-      try {
-        const snapshot = currentBusinessInvoice(source.invoice), output = await invoiceFiles(snapshot, source.format);
-        if (epoch === connectionEpoch && generated === source) displayExport({ ...source, ...output, invoice: snapshot });
-      } finally { generating = false; updateCloudControls(); }
+      try { await renderCurrentExport(source, epoch); }
+      finally { generating = false; updateCloudControls(); }
     }
   } catch (error) { if (epoch === connectionEpoch) cloudError(error, { focus: false }); }
   finally { checkingAccess = false; }
