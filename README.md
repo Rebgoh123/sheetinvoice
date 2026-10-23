@@ -12,7 +12,7 @@ There is no separate website account or password. The app is public; Google auth
 4. Return to **Invoice**, enter a customer and items, then **Save** or **Save & PDF**. New invoices are unpaid; tick **Mark as paid** when paid.
 5. Use **Past transactions** to filter by customer and payment status, open an invoice or mark it paid.
 
-To reuse items, open **Settings → Saved items → Edit in Google Sheet**. In the Sheet's **Saved items** tab, enter `Description`, `Quantity` and `Unit price (SGD)` under the existing column headings. Quantity defaults to 1 when blank; leave the price blank if it varies per invoice. Return to the app and choose **Refresh records**, then use **Add a saved item…** on an invoice. It fills a blank line or adds a new one; you can edit the values for that job. Up to 100 saved items are loaded per Sheet. Older workbooks get the tab through **Set up saved items**.
+To reuse items, open **Settings → Saved items → Edit in Google Sheet**. In the Sheet's **Saved items** tab, enter `Description`, `Quantity` and `Unit price (SGD)` under the existing column headings. Quantity defaults to 1 when blank; leave the price blank if it varies per invoice. Return to the app and choose **Refresh records**. Tap the saved-item tags at the top of the invoice to add them; tapping the same description and price again increases its quantity. Tags show the quantity already added and keep focus for repeated taps. You can edit the line for that job. Up to 100 saved items are loaded per Sheet. Older workbooks get the tab through **Set up saved items**.
 
 Business defaults can also be edited directly in the Sheet's **Settings** tab: change the value beside Business name, Business address, Contact name, Business phone, Business email, UEN / registration, Payment instructions, Invoice footer or Review link. Keep the labels and `schema` row intact, then **Refresh records** in the app. For older workbooks, save Business details once in the app to replace the old JSON profile with these readable rows. Customers already have their own editable **Customers** tab. Refresh loads Sheet changes; existing invoice snapshots are preserved.
 
@@ -32,7 +32,9 @@ Each Sheet has its own business profile. New invoices use that profile. Saved in
 
 PDFs are created in the browser. **Share PDF** opens the device share menu; select WhatsApp and confirm the recipient yourself. Some receiving apps omit text when sharing a file; **Copy message** and **Open WhatsApp** provide the same invoice message. The review request appears only when your business profile has a review URL. Desktop browsers can download the PDF for manual attachment.
 
-Without Google configuration or a connection, you can enter business details in Settings and generate a PDF in the current tab. Saving and history require a connected Sheet. Reconnect when Google's short-lived authorization expires.
+Your working invoice, business defaults, design and saved-item tags are automatically remembered in local storage. Refreshing or reopening the app restores them, including the invoice's record/revision IDs for safe reconnection. Only one current invoice is kept per browser profile; the last tab that saves locally wins. Use **Settings → This device → Clear this device’s data** or **Disconnect** to forget it. Clearing device data does not delete saved Google Sheets records.
+
+Without Google configuration or a connection, you can enter business details, use remembered tags and generate a PDF. Saving to Google Sheets, loading customers and history require reconnecting Google. Access tokens and generated PDFs are never persisted; PDF-only generation clearly reports that it has not saved the invoice to Sheets.
 
 ## Run locally
 
@@ -87,10 +89,10 @@ The app includes a [Privacy & data page](https://rebgoh123.github.io/sheetinvoic
 - Keep the workbook's General access **Restricted**. Share only with individual people who should use it, as Editors. The app checks edit permission and refuses public, published, domain or group sharing before loading or saving.
 - Records travel directly between the browser and Google's APIs. The static host does not receive invoice cells, access tokens or PDFs from the app. Like any website, its host may log ordinary page requests/IP addresses; Google receives the API requests.
 - Your Google account ID and verified email identify the connection. The app also reads available workbook names, file metadata/permissions and the connected Sheet's business settings, customers, invoices and items. These are used to render the app, save your changes and generate PDFs.
-- Tokens, account details, loaded records and drafts remain in memory. Only the selected Sheet ID, stored under your Google account ID, is remembered in browser local storage; an ID grants no access. Shared-device users should Disconnect when finished. Disconnect leaves this remembered ID intact; clear site storage to forget it.
-- Disconnect clears the tab's loaded records, profile, draft and generated PDF. It leaves saved Sheets data intact and does not sign out of Google globally. Token expiry clears loaded lists and retains a dirty draft for reconnecting. Revoked access clears the tab's data. Previously downloaded or shared files cannot be recalled.
+- Local storage holds the current invoice (including customer details), business defaults, design, saved-item tags and account/Sheet/record IDs. It is readable by anyone using the same browser profile, even without Google sign-in. Tokens, verified email, the full customer list, transaction history and generated PDFs remain in memory. The app never stores tokens locally.
+- Disconnect and Clear this device’s data remove remembered data and Sheet IDs, clear open SheetInvoice tabs (suspended tabs clear on resume) and leave saved Sheets records intact. They do not sign out of Google globally. Token expiry retains the working draft/defaults for reconnection. Detected permission/privacy failures clear remembered data. Account changes clear the previous account's working data. Previously downloaded or shared files cannot be recalled.
 - No advertising, tracking scripts, analytics or paid tier are included. Google Identity and Picker load from Google's services.
-- Unsaved edits disappear on reload/tab closure. Save to Sheets before leaving; mobile browsers may not display the leave-page warning.
+- Device storage is one working copy, not a history backup. Private browsing, cleared browser storage or device loss can remove it; save important invoices to your Sheet. If storage is unavailable, the app reports it in Settings and keeps edits in the current tab only.
 
 ## Workbook and current limits
 

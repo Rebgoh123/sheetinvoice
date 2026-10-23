@@ -44,6 +44,7 @@ const googleConfig = {
             <div id="connect-hint" class="connect-hint"><span id="connect-hint-text">Connect Google to save invoices.</span><button class="iv-text-button" type="button" data-open-settings>Connect</button></div>
             <div id="error-box" class="notice" role="alert" tabindex="-1" hidden></div>
             <form id="invoice-form">
+              <section id="quick-items" class="iv-quick-items" aria-labelledby="quick-items-heading" hidden><h2 id="quick-items-heading">Saved items</h2><div id="saved-item-tags" class="iv-item-tags" role="group" aria-label="Tap to add saved items"></div><p id="quick-add-status" class="sr-only" role="status"></p></section>
               <div class="iv-customer-grid">
                 <div>
                   <div class="iv-label-row"><label id="customer-label" for="customer-name">Customer</label><button id="new-customer" class="iv-text-button" type="button" hidden>+ New customer</button></div>
@@ -56,7 +57,6 @@ const googleConfig = {
               <div class="iv-meta-grid"><div><label for="invoice-number">Invoice number</label><input id="invoice-number" name="invoiceNumber" maxlength="70" required /></div><div><label for="invoice-date">Date</label><input id="invoice-date" name="invoiceDate" type="date" required /></div></div>
               <section class="iv-items" aria-labelledby="items-heading">
                 <div class="iv-section-heading"><h2 id="items-heading">Items</h2><span>SGD</span></div>
-                <div id="saved-item-field" class="iv-saved-item" hidden><label class="sr-only" for="saved-item">Add a saved item</label><select id="saved-item"><option value="">Add a saved item…</option></select></div>
                 <div class="iv-item-head" aria-hidden="true"><span>Description</span><span>Qty</span><span>Unit price</span><span class="iv-right">Amount</span><span></span></div>
                 <div id="items"></div>
                 <button id="add-item" class="iv-text-button iv-add-item" type="button"><Icon name="plus" />Add item</button>
@@ -90,7 +90,7 @@ const googleConfig = {
               <div class="iv-section-heading"><h2 id="google-heading">Google Sheet</h2><button id="disconnect-google" class="iv-text-button" type="button" hidden>Disconnect</button></div>
               <p id="google-status" class="field-help" role="status">Connect Google to save records in a private Sheet.</p>
               <button id="connect-google" class="iv-button" type="button" disabled>Loading Google…</button>
-              <p class="field-help">Your records are read and saved directly in your Google Sheet. SheetInvoice keeps no server copy. <a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></p>
+              <p class="field-help">Your Sheet syncs directly with Google. Drafts and defaults are also remembered on this device. SheetInvoice keeps no server copy. <a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></p>
               <div id="sheet-setup" hidden>
                 <form id="create-sheet-form" class="sheet-create"><div><label for="sheet-name">New Sheet name</label><input id="sheet-name" value="My invoices" required maxlength="100" /></div><button id="create-sheet" class="iv-button iv-primary" type="submit">Create private Sheet</button></form>
                 <div class="sheet-existing"><div><label for="existing-sheet">Existing invoice workbook</label><select id="existing-sheet"><option value="">Choose a workbook</option></select></div><button id="use-existing-sheet" class="iv-button" type="button" disabled>Use Sheet</button></div>
@@ -119,7 +119,7 @@ const googleConfig = {
               <p id="saved-items-status" class="field-help" role="status"></p>
               <p id="saved-items-warning" class="notice" role="status" hidden></p>
               <div class="sheet-actions"><button id="setup-saved-items" class="iv-button" type="button">Set up saved items</button><a id="edit-saved-items" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
-              <p class="field-help">After editing the Sheet, select Refresh records above. Choose a saved item on an invoice to fill its description, quantity and price.</p>
+              <p class="field-help">After editing the Sheet, select Refresh records above. Tap a saved-item tag at the top of an invoice to add it. Tap again to increase the quantity.</p>
             </section>
             <section id="design-settings" class="iv-setting-section" aria-labelledby="design-heading" hidden>
               <h2 id="design-heading">Invoice design</h2>
@@ -129,7 +129,7 @@ const googleConfig = {
               <p id="design-warning" class="notice" role="status" hidden></p>
               <button id="apply-design" class="iv-text-button" type="button" hidden>Apply design to current invoice</button><p id="design-status" class="field-help" role="status"></p>
             </section>
-            <details class="iv-notes"><summary>This device</summary><div class="device-actions"><button id="clear-device" class="iv-text-button" type="button">Clear this tab’s data</button></div></details>
+            <details class="iv-notes"><summary>This device</summary><p class="field-help">Your current invoice, business details, design and saved items are remembered in this browser. Clear remembered data when using a shared device. Google sign-in and transaction history are not stored here.</p><p id="device-storage-status" class="field-help" role="status"></p><div class="device-actions"><button id="clear-device" class="iv-text-button" type="button">Clear this device’s data</button></div></details>
           </section>
           <section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>
             <div class="iv-title-row"><h1 id="result-heading" tabindex="-1">Invoice ready</h1><button id="edit-invoice" class="iv-text-button" type="button">Back to invoice</button></div>
