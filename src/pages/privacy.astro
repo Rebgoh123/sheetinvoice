@@ -28,7 +28,7 @@ const canonical = Astro.site ? new URL(`${base}privacy/`, Astro.site).href : nul
           <h2>What Google access is used for</h2>
           <ul>
             <li>Google handles sign-in. The app uses your Google account ID and verified email to identify the connection; it never receives your Google password.</li>
-            <li>The app lists invoice workbooks already available to it and checks file metadata, edit permissions and sharing settings. It reads business defaults, saved item descriptions and prices, customers, invoices and items from the Sheet you connect.</li>
+            <li>The app lists invoice workbooks already available to it and checks file metadata, edit permissions and sharing settings. It reads business defaults, invoice design settings, saved item descriptions and prices, customers, invoices and items from the Sheet you connect.</li>
             <li>Creating a workbook or saving business details, customers, invoices and payment updates sends those changes directly to Google's APIs. The app uses <a href="https://developers.google.com/workspace/drive/api/guides/api-specific-auth">Google's per-file permission</a> for app-created or explicitly chosen files, rather than requesting access to your entire Drive.</li>
           </ul>
           <p>Keep your Sheet's General access Restricted. Its sharing permissions determine who can access it; SheetInvoice checks these permissions before loading or saving.</p>

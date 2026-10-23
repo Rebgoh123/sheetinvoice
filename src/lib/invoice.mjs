@@ -1,3 +1,5 @@
+import { normalizeDesign } from './invoice-design.mjs';
+
 export const MAX_ITEMS = 40;
 export const defaultSeller = {
   name: "", address: "", contact: "", phone: "", email: "",
@@ -28,7 +30,7 @@ export function singaporeDate(now = new Date()) {
   }).format(now);
 }
 
-export function newInvoice(seller = defaultSeller, now = new Date()) {
+export function newInvoice(seller = defaultSeller, now = new Date(), design) {
   const suffix = globalThis.crypto.randomUUID().slice(0, 6).toUpperCase();
   return {
     number: `${singaporeDate(now).replaceAll("-", "").slice(2)}-${suffix}`,
@@ -38,6 +40,7 @@ export function newInvoice(seller = defaultSeller, now = new Date()) {
     items: [{ description: "", quantity: "1", price: "" }],
     notes: "",
     seller: normalizeSeller(seller),
+    design: normalizeDesign(design),
   };
 }
 
@@ -134,6 +137,7 @@ export function restoreDraft(raw) {
       status: source.status || 'unpaid',
       customer: { name: take(source.customer?.name, 120), phone: take(source.customer?.phone, 40), address: take(source.customer?.address, 400) },
       seller: normalizeSeller(source.seller),
+      design: normalizeDesign(source.design),
       items: source.items.slice(0, MAX_ITEMS).map((item) => ({ description: take(item?.description, 240), quantity: take(item?.quantity, 3, "1"), price: take(item?.price, 10) })),
       notes: take(source.notes, 1200),
     };

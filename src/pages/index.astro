@@ -121,6 +121,14 @@ const googleConfig = {
               <div class="sheet-actions"><button id="setup-saved-items" class="iv-button" type="button">Set up saved items</button><a id="edit-saved-items" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
               <p class="field-help">After editing the Sheet, select Refresh records above. Choose a saved item on an invoice to fill its description, quantity and price.</p>
             </section>
+            <section id="design-settings" class="iv-setting-section" aria-labelledby="design-heading" hidden>
+              <h2 id="design-heading">Invoice design</h2>
+              <p class="field-help">Choose colours and left, centre or right text alignment in your Sheet’s Invoice design tab. Each setting includes its available options.</p>
+              <div class="sheet-actions"><button id="setup-design" class="iv-button" type="button">Set up invoice design</button><a id="edit-design" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
+              <p class="field-help">After editing, select Refresh records. New invoices use this design. Saved invoices keep their original design.</p>
+              <p id="design-warning" class="notice" role="status" hidden></p>
+              <button id="apply-design" class="iv-text-button" type="button" hidden>Apply design to current invoice</button><p id="design-status" class="field-help" role="status"></p>
+            </section>
             <details class="iv-notes"><summary>This device</summary><div class="device-actions"><button id="clear-device" class="iv-text-button" type="button">Clear this tab’s data</button></div></details>
           </section>
           <section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>

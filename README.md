@@ -16,6 +16,18 @@ To reuse items, open **Settings → Saved items → Edit in Google Sheet**. In t
 
 Business defaults can also be edited directly in the Sheet's **Settings** tab: change the value beside Business name, Business address, Contact name, Business phone, Business email, UEN / registration, Payment instructions, Invoice footer or Review link. Keep the labels and `schema` row intact, then **Refresh records** in the app. For older workbooks, save Business details once in the app to replace the old JSON profile with these readable rows. Customers already have their own editable **Customers** tab. Refresh loads Sheet changes; existing invoice snapshots are preserved.
 
+To customise the PDF, open **Settings → Invoice design**. Older workbooks first need **Set up invoice design**. Use **Edit in Google Sheet** and change the **Value** column in the **Invoice design** tab:
+
+| Setting | Example / options |
+| --- | --- |
+| Accent colour | `#285D60` for headings and table lines |
+| Text colour | `#233B37` for invoice text |
+| Business alignment | `left`, `center` or `right` |
+| Item text alignment | `left`, `center` or `right` for descriptions, address, payment and notes |
+| Footer alignment | `left`, `center` or `right` |
+
+Keep the Setting/Value/Options headings and setting labels intact. Blank values use the defaults. Colours use six-digit hex codes and must be readable on white (at least 4.5:1 contrast); invalid or too-light colours fall back to the default with a warning in Settings. Return to **Refresh records** to load edits. New invoices and unsaved new drafts use the Sheet's design. Saved invoices store their own design snapshot; reopening or marking them paid preserves it. Use **Apply design to current invoice** to restyle an existing invoice, then save. The PDF keeps its A4 layout and numeric columns.
+
 Each Sheet has its own business profile. New invoices use that profile. Saved invoices retain their original seller/customer snapshot; opening an old invoice does not replace the Sheet's business settings. Editing Business details also applies them to the current invoice; save the profile and invoice separately when appropriate.
 
 PDFs are created in the browser. **Share PDF** opens the device share menu; select WhatsApp and confirm the recipient yourself. Some receiving apps omit text when sharing a file; **Copy message** and **Open WhatsApp** provide the same invoice message. The review request appears only when your business profile has a review URL. Desktop browsers can download the PDF for manual attachment.
@@ -82,7 +94,7 @@ The app includes a [Privacy & data page](https://rebgoh123.github.io/sheetinvoic
 
 ## Workbook and current limits
 
-The app creates **Customers**, **Invoices**, **Invoice items**, **Settings** and **Saved items** tabs. Business details use readable key/value rows in Settings; older `seller` JSON profiles remain readable until saved in the new format. Invoice snapshots preserve the profile and items at the time of saving. Saved items is optional for existing workbooks, and invalid preset rows are skipped with a warning in Settings. Do not reorder/rename app columns. Existing invoice workbooks with the legacy `nls-invoice-v1` schema can also be chosen; their data is read only after Google authorization. Arbitrary spreadsheet layouts are not imported or overwritten.
+The app creates **Customers**, **Invoices**, **Invoice items**, **Settings**, **Saved items** and **Invoice design** tabs. Business details use readable key/value rows in Settings; older `seller` JSON profiles remain readable until saved in the new format. Invoice snapshots preserve the profile, items and design at the time of saving; older invoices without a design use the original defaults. Saved items and Invoice design are optional for existing workbooks. Invalid preset rows are skipped with a warning in Settings. Do not reorder/rename app columns. Existing invoice workbooks with the legacy `nls-invoice-v1` schema can also be chosen; their data is read only after Google authorization. Arbitrary spreadsheet layouts are not imported or overwritten.
 
 This first version uses SGD, Singapore date/phone defaults, integer-cent totals and up to 40 items. It does not calculate tax, deposits or discounts. Invoice numbers are editable and unique within the selected workbook, not centrally sequential. Save retries use stable revision IDs. Concurrent editing has conflict detection but no transactional lock: avoid editing the same invoice on multiple devices at once. Customer updates are last-write-wins. Archive into a new workbook before reaching 10,000 rows per tab.
 
