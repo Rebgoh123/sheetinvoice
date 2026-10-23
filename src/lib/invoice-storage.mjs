@@ -2,9 +2,43 @@ import { normalizeSeller, priceInCents, restoreDraft } from './invoice.mjs';
 import { normalizeDesign } from './invoice-design.mjs';
 
 const KEY = 'sheetinvoice-device-v1';
+const SESSION_KEY = 'sheetinvoice-google-tab-v1';
+const MAX_SESSION_MS = 60 * 60 * 1000;
 export const FORGET_KEY = 'sheetinvoice-forget-v1';
 const uuid = value => typeof value === 'string' && /^[a-f0-9-]{36}$/i.test(value);
 const fileId = value => typeof value === 'string' && /^[a-zA-Z0-9_-]{10,200}$/.test(value);
+
+function validSession(value, clientId, forgetMarker) {
+  const now = Date.now();
+  return value?.version === 1 && typeof clientId === 'string' && !!clientId && value.clientId === clientId &&
+    value.forgetMarker === (forgetMarker ?? null) && typeof value.accountId === 'string' && /^[a-zA-Z0-9_-]{1,200}$/.test(value.accountId) &&
+    typeof value.token === 'string' && /^[a-zA-Z0-9._~+/-]{1,8192}={0,2}$/.test(value.token) &&
+    Number.isFinite(value.expiresAt) && value.expiresAt > now && value.expiresAt <= now + MAX_SESSION_MS;
+}
+export function loadGoogleSession(clientId, forgetMarker, storage) {
+  try {
+    storage ??= globalThis.sessionStorage;
+    const raw = storage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const value = raw.length <= 12000 ? JSON.parse(raw) : null;
+    if (validSession(value, clientId, forgetMarker)) return { token: value.token, expiresAt: value.expiresAt, accountId: value.accountId };
+    storage.removeItem(SESSION_KEY);
+  } catch { clearGoogleSession(storage); }
+  return null;
+}
+export function saveGoogleSession(value, clientId, forgetMarker, storage) {
+  try {
+    storage ??= globalThis.sessionStorage;
+    const saved = { version: 1, clientId, forgetMarker: forgetMarker ?? null, accountId: value.accountId,
+      token: value.token, expiresAt: Math.min(value.expiresAt, Date.now() + MAX_SESSION_MS) };
+    if (!validSession(saved, clientId, forgetMarker)) return false;
+    storage.setItem(SESSION_KEY, JSON.stringify(saved));
+    return true;
+  } catch { return false; }
+}
+export function clearGoogleSession(storage) {
+  try { storage ??= globalThis.sessionStorage; storage?.removeItem(SESSION_KEY); return true; } catch { return false; }
+}
 
 export function loadDevice(storage) {
   try {
@@ -42,11 +76,12 @@ export function saveDevice(value, storage) {
   } catch { return false; }
 }
 export function forgetDevice(storage, broadcast = true) {
+  const sessionCleared = clearGoogleSession();
   try {
     storage ??= globalThis.localStorage;
     const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index));
     for (const key of keys) if (key === KEY || key?.startsWith('sheetinvoice-sheet-')) storage.removeItem(key);
     if (broadcast) storage.setItem(FORGET_KEY, crypto.randomUUID());
-    return true;
+    return sessionCleared;
   } catch { return false; }
 }

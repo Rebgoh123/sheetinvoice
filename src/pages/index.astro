@@ -89,6 +89,7 @@ const googleConfig = {
               <h2 id="google-heading">Google Sheet</h2>
               <p id="google-status" class="field-help" role="status">Connect your Google Sheet to keep customers, invoices and business details together.</p>
               <button id="connect-google" class="iv-button iv-primary" type="button" disabled>Connect Google Sheet</button>
+              <p id="google-session-status" class="field-help" role="status" hidden>This browser could not remember the Google connection for this tab. Refreshing may require reconnecting.</p>
               <p class="field-help">Records stay in your Sheet. Drafts are remembered on this device. <a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></p>
               <div id="sheet-setup" hidden>
                 <form id="create-sheet-form" class="sheet-create"><div><label for="sheet-name">New Sheet name</label><input id="sheet-name" value="My invoices" required maxlength="100" /></div><button id="create-sheet" class="iv-button iv-primary" type="submit">Create private Sheet</button></form>
@@ -131,7 +132,7 @@ const googleConfig = {
               <p id="design-warning" class="notice" role="status" hidden></p>
               <button id="apply-design" class="iv-text-button" type="button" hidden>Apply design to current invoice</button><p id="design-status" class="field-help" role="status"></p>
             </details>
-            <details class="iv-notes"><summary>This device</summary><p class="field-help">Your current invoice, business details, design and saved items are remembered in this browser. Clear remembered data when using a shared device. Google sign-in and transaction history are not stored here.</p><p id="device-storage-status" class="field-help" role="status"></p><div class="device-actions"><button id="clear-device" class="iv-text-button" type="button">Clear this device’s data</button></div></details>
+            <details class="iv-notes"><summary>This device</summary><p class="field-help">Your current invoice and defaults are remembered in this browser. The temporary Google connection is kept for this tab until it expires, so refreshing can restore your Sheet. Disconnect when finished on a shared device. Transaction history is loaded directly from Google.</p><p id="device-storage-status" class="field-help" role="status"></p><div class="device-actions"><button id="clear-device" class="iv-text-button" type="button">Clear this device’s data</button></div></details>
           </section>
           <section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>
             <div class="iv-title-row"><h1 id="result-heading" tabindex="-1">Invoice ready</h1><button id="edit-invoice" class="iv-text-button" type="button">Back to invoice</button></div>

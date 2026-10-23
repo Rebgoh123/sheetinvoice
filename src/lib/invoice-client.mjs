@@ -6,11 +6,11 @@ import {
 import { InvoiceSheets, SAVED_ITEMS_TAB, DESIGN_TAB } from './invoice-sheets.mjs';
 import { normalizeDesign } from './invoice-design.mjs';
 import { prepareGoogle, preparePicker, chooseSheet } from './invoice-google.mjs';
-import { loadDevice, saveDevice, forgetDevice, FORGET_KEY } from './invoice-storage.mjs';
+import { loadDevice, saveDevice, forgetDevice, FORGET_KEY, loadGoogleSession, saveGoogleSession, clearGoogleSession } from './invoice-storage.mjs';
 
 const $ = (id) => document.getElementById(id);
 const form = $("invoice-form");
-// Only the current invoice and reusable defaults are cached. Tokens and history stay in memory.
+// Drafts/defaults use local storage. A short-lived Google token uses this tab's session storage.
 function stored(key) { try { return localStorage.getItem(key); } catch { return null; } }
 const remembered = loadDevice();
 let forgetMarker = stored(FORGET_KEY);
@@ -22,6 +22,7 @@ let cachedItems = remembered?.savedItems || [], cachedDesign = remembered?.desig
 if (!invoice.items.length) invoice.items.push({ description: "", quantity: "1", price: "" });
 let generated = null, objectUrl = null, revision = 0, generating = false, sharing = false;
 let sheets = null, workbook = null, googleUser = null, tokenClient = null, googleBusy = false, pickerReady = false, googleLoadFailed = false;
+let restoringSession = false;
 let connectionEpoch = 0, loginEpoch = null, expiryTimer = null, requiresSheetSave = !!remembered?.workbookId, dirty = remembered?.dirty || false;
 let checkingAccess = false;
 let recordId = remembered?.recordId || crypto.randomUUID(), recordRevision = remembered?.recordRevision || crypto.randomUUID(), customerId = remembered?.customerId || null, recordWorkbookId = remembered?.workbookId || null;
@@ -434,22 +435,24 @@ function resetWorkingData() {
   recordId = crypto.randomUUID(); baseRevision = null; recordRevision = crypto.randomUUID(); revision++; discardPdf(); fillForm();
 }
 function disconnectAndClear(broadcast = true) {
-  connectionEpoch++; clearTimeout(expiryTimer); sheets?.disconnect(); sheets = null; workbook = null; googleUser = null; requiresSheetSave = false; googleBusy = false;
+  connectionEpoch++; clearTimeout(expiryTimer); sheets?.disconnect(); sheets = null; workbook = null; googleUser = null; requiresSheetSave = false; googleBusy = false; restoringSession = false;
   const cleared = forgetDevice(undefined, broadcast); forgetMarker = stored(FORGET_KEY); resetWorkingData();
   $('sheet-setup').hidden = true; $('sheet-connected').hidden = true; $('existing-sheet').replaceChildren(new Option('Choose a workbook', ''));
   $('open-sheet').removeAttribute('href'); $('connected-sheet-name').textContent = ''; $('business-save-status').textContent = '';
   $('google-error').hidden = true; $('google-status').textContent = 'Disconnected. Remembered data has been cleared from this device. Your Sheet is unchanged.';
+  $('google-session-status').hidden = true;
   renderCloudRecords(); persist();
   if (!cleared) $('device-storage-status').textContent = 'This browser could not clear remembered data. Clear this site’s storage in your browser settings.';
 }
 
 function updateCloudControls() {
-  $('connect-google').disabled = (!tokenClient && !googleLoadFailed) || googleBusy || generating;
+  const canRestore = !!loadGoogleSession(googleConfig.clientId, forgetMarker);
+  $('connect-google').disabled = (!tokenClient && !googleLoadFailed && !canRestore) || googleBusy || generating;
   $('connect-google').hidden = !!sheets;
   $('disconnect-google').hidden = !sheets && !googleUser;
   $('connection-options').hidden = !sheets && !googleUser;
   $('change-sheet').hidden = !workbook;
-  const connectLabel = googleBusy ? 'Connecting…' : requiresSheetSave ? 'Reconnect Google Sheet' : 'Connect Google Sheet';
+  const connectLabel = restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : requiresSheetSave ? 'Reconnect Google Sheet' : 'Connect Google Sheet';
   $('connect-google').textContent = connectLabel;
   for (const button of document.querySelectorAll('[data-connect-sheet]')) {
     button.disabled = $('connect-google').disabled;
@@ -470,24 +473,27 @@ function updateCloudControls() {
   $('history-previous').disabled = googleBusy || generating || historyPage === 0;
   $('history-next').disabled = googleBusy || generating || historyPage >= Math.ceil(filteredHistory().length / 10) - 1;
   for (const id of ['new-invoice', 'history-new-invoice', 'new-customer', 'clear-device', 'saved-customer']) $(id).disabled = (googleBusy && !!sheets) || generating;
-  $('connection-label').textContent = workbook ? 'Sheet connected' : googleBusy ? 'Connecting…' : sheets ? 'Choose a Sheet' : requiresSheetSave ? 'Reconnect Sheet' : 'Not connected';
+  $('connection-label').textContent = workbook ? 'Sheet connected' : restoringSession ? 'Restoring Sheet…' : googleBusy ? 'Connecting…' : sheets ? 'Choose a Sheet' : requiresSheetSave ? 'Reconnect Sheet' : 'Not connected';
   $('connection-status').dataset.connected = String(!!workbook);
   $('connect-hint').hidden = !!workbook;
   $('history-connect').hidden = !!workbook;
   $('connect-hint-text').textContent = requiresSheetSave ? 'Reconnect your Sheet to save this draft.' : 'Keep your invoices in your own Sheet.';
 }
-function cloudError(error) {
+function cloudError(error, { quiet = false, focus = true } = {}) {
   $('google-error').textContent = error.message || 'Google could not finish this action. Your draft is still here.';
-  $('google-error').hidden = false;
+  $('google-error').hidden = quiet;
   if (['expired', 'permission', 'privacy'].includes(error.code) && sheets) {
+    clearGoogleSession(); $('google-session-status').hidden = true;
     const expired = error.code === 'expired';
     sheets.disconnect(); sheets = null; workbook = null; connectionEpoch++; clearTimeout(expiryTimer);
-    if (!expired) { forgetDevice(); googleUser = null; requiresSheetSave = false; resetWorkingData(); }
+    googleBusy = false; restoringSession = false;
+    if (!expired) { forgetDevice(); forgetMarker = stored(FORGET_KEY); googleUser = null; requiresSheetSave = false; resetWorkingData(); }
     renderCloudRecords(); $('sheet-setup').hidden = true; $('sheet-connected').hidden = true;
     $('open-sheet').removeAttribute('href'); $('connected-sheet-name').textContent = ''; $('business-save-status').textContent = '';
     $('google-status').textContent = expired ? 'Google disconnected. Your draft is remembered on this device. Reconnect to save to Sheets.' : 'Sheet access is unavailable. Remembered data has been cleared. Connect again after checking sharing settings.';
   }
-  updateCloudControls(); persist(); $('google-error').focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' });
+  updateCloudControls(); persist();
+  if (!quiet && focus) { $('google-error').focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
 }
 async function cloudAction(action) {
   if (googleBusy || generating) return;
@@ -620,41 +626,66 @@ async function showSheetSetup() {
   $('sheet-setup').hidden = false;
   $('google-status').textContent = `${googleUser.email} · Choose or create your invoice Sheet.`;
 }
-async function connected(token) {
+async function connected(token, restoring = false, interactive = false) {
   if (loginEpoch !== connectionEpoch) return;
   loginEpoch = null;
+  if (!restoring) clearGoogleSession();
   const active = new InvoiceSheets(token), epoch = ++connectionEpoch;
   sheets?.disconnect(); sheets = active;
   googleBusy = true; $('google-error').hidden = true; updateCloudControls();
   try {
     const nextUser = await active.user();
     if (epoch !== connectionEpoch) return;
+    if (restoring && (nextUser.id !== token.accountId || (cacheAccountId && cacheAccountId !== nextUser.id))) {
+      clearGoogleSession(); active.disconnect(); sheets = null; workbook = null; googleUser = null; renderCloudRecords();
+      $('google-status').textContent = 'Connect your Google Sheet again to confirm the account. Your draft is still here.'; return;
+    }
     if (cacheAccountId && cacheAccountId !== nextUser.id) {
       $('sheet-connected').hidden = true; $('sheet-setup').hidden = true;
       $('open-sheet').removeAttribute('href'); $('connected-sheet-name').textContent = '';
       if ((dirty || profileDirty) && !window.confirm('This is a different Google account. Clear the remembered draft and defaults, then switch accounts?')) {
-        active.disconnect(); sheets = null; workbook = null; renderCloudRecords();
+        active.disconnect(); sheets = null; workbook = null; clearGoogleSession(); renderCloudRecords();
         $('google-status').textContent = 'Account switch cancelled. Your remembered draft is still on this device.'; return;
       }
       workbook = null; saveDevice(null); resetWorkingData(); renderCloudRecords();
     }
     googleUser = nextUser; cacheAccountId = nextUser.id;
+    $('google-session-status').hidden = saveGoogleSession({ ...token, accountId: nextUser.id }, googleConfig.clientId, forgetMarker);
     clearTimeout(expiryTimer);
-    expiryTimer = setTimeout(() => cloudError(Object.assign(new Error('Your Google connection expired. Reconnect to continue. Your unsaved draft remains in this tab.'), { code: 'expired' })), Math.max(0, token.expiresAt - Date.now()));
-    await showSheetSetup();
+    expiryTimer = setTimeout(() => cloudError(Object.assign(new Error('Your Google connection expired. Reconnect to continue. Your draft is still here.'), { code: 'expired' }), { quiet: true }), Math.max(0, token.expiresAt - Date.now()));
     const previous = recordWorkbookId || stored(`sheetinvoice-sheet-${googleUser.id}`);
-    if (previous && epoch === connectionEpoch) { const next = await active.load(previous); if (epoch === connectionEpoch) finishSheetConnection(next); }
-  } catch (error) { if (epoch === connectionEpoch) cloudError(error); }
-  finally { googleBusy = false; updateCloudControls(); persist(); }
+    if (previous) {
+      const next = await active.load(previous);
+      if (epoch === connectionEpoch) { if (restoring && !interactive) useWorkbook(next); else finishSheetConnection(next); }
+    } else { showView('settings', !restoring); await showSheetSetup(); }
+  } catch (error) {
+    if (epoch === connectionEpoch) {
+      if (!['expired', 'permission', 'privacy'].includes(error.code)) {
+        active.disconnect(); sheets = null; workbook = null; googleUser = null; clearTimeout(expiryTimer); renderCloudRecords();
+      }
+      cloudError(error, { quiet: restoring && error.code === 'expired', focus: !restoring });
+    }
+  } finally {
+    if (epoch === connectionEpoch) { googleBusy = false; restoringSession = false; updateCloudControls(); persist(); }
+  }
+}
+function restoreGoogleConnection(interactive = false) {
+  const session = loadGoogleSession(googleConfig.clientId, forgetMarker);
+  if (!session) return false;
+  if (cacheAccountId && session.accountId !== cacheAccountId) { clearGoogleSession(); return false; }
+  restoringSession = true; loginEpoch = connectionEpoch;
+  void connected(session, true, interactive);
+  return true;
 }
 function connectSheet() {
   showView('settings', false);
   if (sheets) { $('sheet-setup').scrollIntoView({ block: 'nearest' }); return; }
   if (googleBusy) return;
+  if (restoreGoogleConnection(true)) return;
   if (!tokenClient) { if (googleLoadFailed) initializeGoogle(); return; }
   googleBusy = true; $('google-error').hidden = true; updateCloudControls();
   loginEpoch = connectionEpoch;
-  tokenClient.requestAccessToken({ prompt: 'select_account', ...(googleUser ? { hint: googleUser.email } : {}) });
+  tokenClient.requestAccessToken({ prompt: 'select_account', ...(googleUser ? { login_hint: googleUser.id } : {}) });
 }
 $('connect-google').addEventListener('click', connectSheet);
 document.querySelectorAll('[data-connect-sheet]').forEach(button => button.addEventListener('click', connectSheet));
@@ -722,13 +753,14 @@ window.addEventListener('focus', () => {
   active.privateFile(id).catch(error => { if (epoch === connectionEpoch && sheets === active && workbook?.id === id) cloudError(error); }).finally(() => { checkingAccess = false; });
 });
 async function initializeGoogle() {
-  googleBusy = true; googleLoadFailed = false; $('connect-google').textContent = 'Loading Google…'; updateCloudControls();
+  googleLoadFailed = false; updateCloudControls();
   try {
     tokenClient = await prepareGoogle(googleConfig, connected, error => { googleBusy = false; cloudError(error); });
   } catch (error) {
     googleLoadFailed = error.code !== 'configuration';
-    $('google-status').textContent = error.message;
-  } finally { googleBusy = false; updateCloudControls(); }
+    if (!googleUser) $('google-status').textContent = error.message;
+  } finally { updateCloudControls(); }
 }
 initializeGoogle();
+restoreGoogleConnection();
 if (googleConfig.apiKey && googleConfig.appId) preparePicker(googleConfig).then(() => { pickerReady = true; updateCloudControls(); }).catch(cloudError);
