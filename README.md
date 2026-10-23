@@ -64,9 +64,14 @@ By default this uses `https://OWNER.github.io/REPOSITORY/`. Custom hosting can o
 
 ## Privacy and data
 
+**SheetInvoice reads and saves records in the Google Sheet you connect. It does not receive or store copies of those records or generated PDFs on an application server.** Processing runs in your browser, with direct requests to Google's APIs. This is different from saying the app never reads or saves anything.
+
+The app includes a [Privacy & data page](https://rebgoh123.github.io/sheetinvoice/privacy/), linked beside Connect Google and from the footer. Self-hosted forks should review and update that notice to match their deployment.
+
 - Keep the workbook's General access **Restricted**. Share only with individual people who should use it, as Editors. The app checks edit permission and refuses public, published, domain or group sharing before loading or saving.
 - Records travel directly between the browser and Google's APIs. The static host does not receive invoice cells, access tokens or PDFs from the app. Like any website, its host may log ordinary page requests/IP addresses; Google receives the API requests.
-- Tokens, loaded records and drafts remain in memory. Only the selected Sheet ID per Google user is remembered in browser local storage; an ID grants no access. Shared-device users should Disconnect when finished.
+- Your Google account ID and verified email identify the connection. The app also reads available workbook names, file metadata/permissions and the connected Sheet's business settings, customers, invoices and items. These are used to render the app, save your changes and generate PDFs.
+- Tokens, account details, loaded records and drafts remain in memory. Only the selected Sheet ID, stored under your Google account ID, is remembered in browser local storage; an ID grants no access. Shared-device users should Disconnect when finished. Disconnect leaves this remembered ID intact; clear site storage to forget it.
 - Disconnect clears the tab's loaded records, profile, draft and generated PDF. It leaves saved Sheets data intact and does not sign out of Google globally. Token expiry clears loaded lists and retains a dirty draft for reconnecting. Revoked access clears the tab's data. Previously downloaded or shared files cannot be recalled.
 - No advertising, tracking scripts, analytics or paid tier are included. Google Identity and Picker load from Google's services.
 - Unsaved edits disappear on reload/tab closure. Save to Sheets before leaving; mobile browsers may not display the leave-page warning.

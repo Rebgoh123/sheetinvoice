@@ -89,6 +89,7 @@ const googleConfig = {
               <div class="iv-section-heading"><h2 id="google-heading">Google Sheet</h2><button id="disconnect-google" class="iv-text-button" type="button" hidden>Disconnect</button></div>
               <p id="google-status" class="field-help" role="status">Connect Google to save records in a private Sheet.</p>
               <button id="connect-google" class="iv-button" type="button" disabled>Loading Google…</button>
+              <p class="field-help">Your records are read and saved directly in your Google Sheet. SheetInvoice keeps no server copy. <a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></p>
               <div id="sheet-setup" hidden>
                 <form id="create-sheet-form" class="sheet-create"><div><label for="sheet-name">New Sheet name</label><input id="sheet-name" value="My invoices" required maxlength="100" /></div><button id="create-sheet" class="iv-button iv-primary" type="submit">Create private Sheet</button></form>
                 <div class="sheet-existing"><div><label for="existing-sheet">Existing invoice workbook</label><select id="existing-sheet"><option value="">Choose a workbook</option></select></div><button id="use-existing-sheet" class="iv-button" type="button" disabled>Use Sheet</button></div>
@@ -123,6 +124,7 @@ const googleConfig = {
           </section>
         </div>
       </main>
+      <footer class="iv-site-footer"><a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></footer>
     </div>
     <template id="item-template"><div class="iv-item invoice-item"><div><label class="description-label">Description</label><input class="item-description" placeholder="Item or service description" maxlength="240" required /></div><div><label class="quantity-label">Qty</label><input class="item-quantity" type="number" inputmode="numeric" min="1" max="999" step="1" required /></div><div><label class="price-label">Unit price</label><input class="item-price" type="number" inputmode="decimal" min="0" max="9999999.99" step="0.01" placeholder="0.00" required /></div><div class="line-total"><span>Amount</span><strong class="iv-item-total">S$0.00</strong></div><button class="iv-remove remove-item" type="button" aria-label="Remove item"><Icon name="trash" /></button></div></template>
     <script>import '../lib/invoice-client.mjs';</script>

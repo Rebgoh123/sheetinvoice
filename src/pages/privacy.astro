@@ -1,0 +1,57 @@
+---
+import '../styles/invoice.css';
+const base = import.meta.env.BASE_URL;
+const canonical = Astro.site ? new URL(`${base}privacy/`, Astro.site).href : null;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="How SheetInvoice reads, saves and handles your Google Sheet data." />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Privacy &amp; data | SheetInvoice</title>
+    {canonical && <link rel="canonical" href={canonical} />}
+    <link rel="icon" type="image/svg+xml" href={`${base}invoice-icon.svg`} />
+  </head>
+  <body class="invoice-app">
+    <a class="skip" href="#main">Skip to privacy information</a>
+    <div class="iv-shell">
+      <header class="iv-header"><div class="iv-brand">SheetInvoice</div><a class="iv-text-button" href={base}>Back to invoices</a></header>
+      <main id="main" class="iv-main">
+        <article class="iv-panel privacy-content">
+          <h1>Privacy &amp; data</h1>
+          <p><strong>Your Google Sheet stores your records. SheetInvoice reads and saves those records directly from your browser. It has no application backend that receives or stores your business details, customers, invoices or PDFs.</strong></p>
+          <p>This does not mean the app never reads data: it needs to read your connected Sheet to display records, and write to it when you save.</p>
+
+          <h2>What Google access is used for</h2>
+          <ul>
+            <li>Google handles sign-in. The app uses your Google account ID and verified email to identify the connection; it never receives your Google password.</li>
+            <li>The app lists invoice workbooks already available to it and checks file metadata, edit permissions and sharing settings. It reads business settings, customers, invoices and items from the Sheet you connect.</li>
+            <li>Creating a workbook or saving business details, customers, invoices and payment updates sends those changes directly to Google's APIs. The app uses <a href="https://developers.google.com/workspace/drive/api/guides/api-specific-auth">Google's per-file permission</a> for app-created or explicitly chosen files, rather than requesting access to your entire Drive.</li>
+          </ul>
+          <p>Keep your Sheet's General access Restricted. Its sharing permissions determine who can access it; SheetInvoice checks these permissions before loading or saving.</p>
+
+          <h2>What stays in your browser</h2>
+          <p>Access tokens, account details, loaded records and unsaved edits are held in the current tab's memory. The app does not save invoice contents or tokens in browser local storage or cookies.</p>
+          <p>The selected Sheet ID is remembered in local storage under your Google account ID, so you can reconnect to the same workbook. This identifier is not a copy of the records and grants no access on its own.</p>
+          <p>PDFs are generated locally in your browser. Copying a message uses your clipboard. Downloading or choosing a sharing action gives the file or message to the destination you select, such as WhatsApp. SheetInvoice does not send messages automatically.</p>
+
+          <h2>Hosting and third-party services</h2>
+          <p>SheetInvoice includes no advertising or app analytics. Google Identity and Picker scripts load from Google, and Google processes sign-in and API requests under its <a href="https://policies.google.com/privacy">privacy policy</a>.</p>
+          <p>This site is hosted on GitHub Pages. <a href="https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages#data-collection">GitHub logs visitors' IP addresses for security</a>. This hosting activity is separate from your Sheet records, which the app sends directly between your browser and Google.</p>
+
+          <h2>Your controls</h2>
+          <ul>
+            <li><strong>Disconnect</strong> clears the app's account connection, loaded records, current draft and generated PDF from this tab. It leaves the saved Sheet and remembered Sheet ID intact.</li>
+            <li>Clear this site's browser storage to forget the remembered Sheet ID. Unsaved edits are not a backup; save anything you need to keep before leaving.</li>
+            <li>You can revoke Google access through <a href="https://myaccount.google.com/connections">Google Account connections</a>. To edit or remove saved records, manage the workbook in Google Sheets or Drive.</li>
+            <li>Saved invoices and their revisions contain historical details. Editing a customer or business profile does not erase those earlier snapshots. Disconnecting or revoking access cannot recall downloaded files, copied messages or copies you have shared.</li>
+          </ul>
+          <p>You can inspect the implementation in the <a href="https://github.com/Rebgoh123/sheetinvoice">public source repository</a>. A separately hosted or modified fork may handle data differently; review that host's notice and source.</p>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>
