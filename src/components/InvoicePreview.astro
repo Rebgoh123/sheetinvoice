@@ -1,11 +1,10 @@
 ---
 import Icon from './InvoiceIcon.astro';
 ---
-<section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>
+<section id="pdf-result" class="iv-panel" aria-labelledby="result-filename" hidden>
   <div class="iv-export-navigation"><button id="result-back" class="iv-text-button" type="button">Back to invoice</button><button id="edit-invoice" class="iv-text-button" type="button" hidden>Edit invoice</button></div>
-  <h1 id="result-heading" tabindex="-1">Invoice ready</h1>
   <div class="pdf-file">
-    <div class="iv-file-summary"><div class="iv-file-title"><strong id="result-filename"></strong><span id="result-payment-status" class="iv-small-badge"></span></div><p id="result-description"></p></div>
+    <div class="iv-file-summary"><div class="iv-file-title"><h1 id="result-filename" tabindex="-1"></h1><span id="result-payment-status" class="iv-small-badge"></span></div><p id="result-description"></p></div>
     <div class="iv-export-toolbar">
       <div class="iv-status-filters" role="group" aria-label="File format"><button type="button" data-export-format="pdf" aria-pressed="true">PDF</button><button type="button" data-export-format="jpg" aria-pressed="false">JPG</button></div>
       <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button" title="Share invoice"><Icon name="share" /><span class="sr-only">Share PDF</span></button><a id="download-pdf" class="iv-button" title="Save invoice" download><span class="sr-only">Download</span><Icon name="download" /></a></div>

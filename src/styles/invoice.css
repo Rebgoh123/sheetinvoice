@@ -150,7 +150,6 @@ body { margin:0; }
 .invoice-app #message-field-status:empty { display:none; }
 .invoice-app .iv-export-navigation { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
 .invoice-app .iv-signature-preview { display:block; max-width:240px; width:100%; height:80px; object-fit:contain; object-position:left center; margin-top:12px; border:1px solid var(--iv-line); background:white; }
-.invoice-app #result-heading { margin-bottom:20px; overflow-wrap:anywhere; }
 .invoice-app .iv-export-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
 .invoice-app #result-format-status:empty,.invoice-app #share-status:empty { display:none; }
 .invoice-app .iv-sheet-choice { margin-top:20px; }
@@ -165,7 +164,7 @@ body { margin:0; }
 .invoice-app .pdf-file { display:flex; align-items:center; flex-wrap:wrap; gap:16px; padding:16px 0; border-block:1px solid var(--iv-line); }
 .invoice-app .iv-file-summary { flex:1; min-width:0; overflow-wrap:anywhere; }
 .invoice-app .iv-file-title { display:flex; align-items:center; gap:8px; }
-.invoice-app .iv-file-title strong { min-width:0; font-weight:500; font-size:14px; }
+.invoice-app .iv-file-title h1 { min-width:0; font-weight:500; font-size:14px; line-height:1.5; letter-spacing:normal; }
 .invoice-app .iv-file-title .iv-small-badge { flex-shrink:0; }
 .invoice-app .pdf-file p { color:var(--iv-muted); font-size:12px; margin-top:4px; }
 .invoice-app .pdf-actions { display:flex; gap:8px; }

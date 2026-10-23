@@ -219,7 +219,6 @@ function displayExport(result) {
   const { files, previews, format, invoice: snapshot, record, savedToSheet } = result, formatLabel = format.toUpperCase();
   if (filesChanged || !objectUrls.length) createExportUrls();
   showExportPage();
-  $('result-heading').textContent = record ? `Invoice ${snapshot.number}` : 'Invoice ready';
   $('result-back').textContent = record ? 'Back to transactions' : 'Back to invoice';
   $('edit-invoice').hidden = !record;
   $('result-error').hidden = true; $('result-format-status').textContent = ''; $('share-status').textContent = '';
