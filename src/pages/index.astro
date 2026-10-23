@@ -1,0 +1,130 @@
+---
+import Icon from '../components/InvoiceIcon.astro';
+import '../styles/invoice.css';
+const title = 'SheetInvoice';
+const canonical = Astro.site ? new URL(import.meta.env.BASE_URL, Astro.site).href : null;
+const googleConfig = {
+  clientId: import.meta.env.PUBLIC_GOOGLE_CLIENT_ID || '',
+  apiKey: import.meta.env.PUBLIC_GOOGLE_API_KEY || '',
+  appId: import.meta.env.PUBLIC_GOOGLE_APP_ID || '',
+};
+---
+<!doctype html>
+<html lang="en-SG">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#285d60" />
+    <meta name="description" content="Create invoices, save to your private Google Sheet and share a PDF." />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>{title}</title>
+    {canonical && <link rel="canonical" href={canonical} />}
+    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}invoice-icon.svg`} />
+  </head>
+  <body class="invoice-app">
+    <a class="skip" href="#main">Skip to invoices</a>
+    <div class="iv-shell">
+      <header class="iv-header">
+        <div class="iv-brand">SheetInvoice<span>YOUR SHEET. YOUR INVOICES.</span></div>
+        <div class="iv-account"><span id="connection-status" class="iv-connection" role="status"><span aria-hidden="true"></span><span id="connection-label">Not connected</span></span><button id="settings-button" class="iv-icon-button" type="button" aria-label="Settings" aria-controls="settings-panel" aria-expanded="false"><Icon name="settings" /><span>Settings</span></button></div>
+      </header>
+      <nav class="iv-tabs" role="tablist" aria-label="Invoices">
+        <button id="invoice-tab" class="iv-tab" type="button" role="tab" aria-controls="invoice-panel" aria-selected="true"><Icon name="invoice" />Invoice</button>
+        <button id="history-tab" class="iv-tab" type="button" role="tab" aria-controls="history-panel" aria-selected="false"><Icon name="history" />Past transactions<span id="history-count" class="iv-tab-count" hidden></span></button>
+      </nav>
+      <main id="main" class="iv-main">
+        <noscript><p class="notice">Enable JavaScript to create invoices.</p></noscript>
+        <script id="invoice-google-config" type="application/json" is:inline set:html={JSON.stringify(googleConfig).replaceAll('<', '\\u003c')} />
+        <p id="google-error" class="notice" role="alert" tabindex="-1" hidden></p>
+        <div id="invoice-app" hidden>
+          <section id="invoice-panel" class="iv-panel" role="tabpanel" aria-labelledby="invoice-tab">
+            <div class="iv-title-row"><div class="iv-title"><h1 id="invoice-heading">New invoice</h1><span id="draft-status" class="draft-status" role="status" hidden></span></div><button id="new-invoice" class="iv-text-button" type="button">Reset<Icon name="reset" /></button></div>
+            <div id="business-hint" class="connect-hint"><span>Add your business details before making an invoice.</span><button class="iv-text-button" type="button" data-open-settings>Set up</button></div>
+            <div id="connect-hint" class="connect-hint"><span id="connect-hint-text">Connect Google to save invoices.</span><button class="iv-text-button" type="button" data-open-settings>Connect</button></div>
+            <div id="error-box" class="notice" role="alert" tabindex="-1" hidden></div>
+            <form id="invoice-form">
+              <div class="iv-customer-grid">
+                <div>
+                  <div class="iv-label-row"><label id="customer-label" for="customer-name">Customer</label><button id="new-customer" class="iv-text-button" type="button" hidden>+ New customer</button></div>
+                  <div id="saved-customer-field" hidden><select id="saved-customer" name="savedCustomer" aria-labelledby="customer-label"><option value="">Choose a customer</option></select></div>
+                  <div id="customer-name-field"><input id="customer-name" name="customerName" autocomplete="section-customer name" placeholder="Customer name" required maxlength="120" aria-labelledby="customer-label" /></div>
+                </div>
+                <div><label for="customer-phone">WhatsApp number</label><input id="customer-phone" name="customerPhone" type="tel" autocomplete="section-customer tel" placeholder="e.g. 9123 4567" maxlength="40" /></div>
+              </div>
+              <div class="iv-field"><label for="customer-address">Service address</label><textarea id="customer-address" name="customerAddress" rows="1" autocomplete="street-address" placeholder="Address for this job" maxlength="400"></textarea></div>
+              <div class="iv-meta-grid"><div><label for="invoice-number">Invoice number</label><input id="invoice-number" name="invoiceNumber" maxlength="70" required /></div><div><label for="invoice-date">Date</label><input id="invoice-date" name="invoiceDate" type="date" required /></div></div>
+              <section class="iv-items" aria-labelledby="items-heading">
+                <div class="iv-section-heading"><h2 id="items-heading">Items</h2><span>SGD</span></div>
+                <div class="iv-item-head" aria-hidden="true"><span>Description</span><span>Qty</span><span>Unit price</span><span class="iv-right">Amount</span><span></span></div>
+                <div id="items"></div>
+                <button id="add-item" class="iv-text-button iv-add-item" type="button"><Icon name="plus" />Add item</button>
+              </section>
+              <details id="invoice-notes" class="iv-notes"><summary>Add a note</summary><label class="sr-only" for="notes">Invoice notes</label><textarea id="notes" name="notes" rows="2" maxlength="1200" placeholder="Job notes or a message for the customer"></textarea></details>
+              <div class="iv-footer">
+                <div class="iv-total"><span>Total</span><strong id="action-total">S$0.00</strong></div>
+                <label class="iv-paid-check"><input id="payment-status" name="paid" type="checkbox" />Mark as paid</label>
+                <div class="iv-save-actions"><button id="save-invoice" class="iv-button" type="submit" name="action" value="save-only" disabled>Save</button><button id="generate-pdf" class="iv-button iv-primary" type="submit" name="action" value="pdf"><span>Generate PDF</span><Icon name="arrow" /></button></div>
+              </div>
+            </form>
+            <p id="invoice-save-status" class="iv-feedback" role="status" hidden></p>
+          </section>
+          <section id="history-panel" class="iv-panel" role="tabpanel" aria-labelledby="history-tab" hidden>
+            <div class="iv-title-row"><h1>Past transactions</h1><button id="history-new-invoice" class="iv-button iv-primary" type="button"><Icon name="plus" />New invoice</button></div>
+            <div id="history-connect" class="connect-hint"><span>Connect your Sheet to view transactions.</span><button class="iv-text-button" type="button" data-open-settings>Connect</button></div>
+            <div class="iv-history-filters">
+              <div><label for="history-customer">Customer</label><select id="history-customer" disabled><option value="">All customers</option></select></div>
+              <div><span id="history-status-label" class="field-label">Payment status</span><div class="iv-status-filters" role="group" aria-labelledby="history-status-label"><button type="button" data-status="all" aria-pressed="true">All</button><button type="button" data-status="unpaid" aria-pressed="false">Unpaid</button><button type="button" data-status="paid" aria-pressed="false">Paid</button></div></div>
+            </div>
+            <p id="history-summary" class="iv-history-summary" role="status"></p>
+            <div id="history-head" class="iv-history-head" aria-hidden="true"><span>Invoice / date</span><span>Customer / service</span><span class="iv-right">Amount</span><span>Status</span><span></span></div>
+            <ul id="history-list" class="history-list" aria-label="Saved transactions"></ul>
+            <p id="history-empty" class="iv-empty">No saved invoices yet.</p>
+            <div id="history-pagination" class="history-pagination" hidden><button id="history-previous" class="iv-text-button" type="button">Previous</button><span id="history-page" role="status"></span><button id="history-next" class="iv-text-button" type="button">Next</button></div>
+            <p id="history-feedback" class="iv-feedback" role="status" hidden></p>
+          </section>
+          <section id="settings-panel" class="iv-panel" aria-labelledby="settings-heading" hidden>
+            <div class="iv-title-row"><h1 id="settings-heading">Settings</h1><button id="settings-done" class="iv-text-button" type="button">Done<Icon name="check" /></button></div>
+            <section class="iv-setting-section" aria-labelledby="google-heading">
+              <div class="iv-section-heading"><h2 id="google-heading">Google Sheet</h2><button id="disconnect-google" class="iv-text-button" type="button" hidden>Disconnect</button></div>
+              <p id="google-status" class="field-help" role="status">Connect Google to save records in a private Sheet.</p>
+              <button id="connect-google" class="iv-button" type="button" disabled>Loading Google…</button>
+              <div id="sheet-setup" hidden>
+                <form id="create-sheet-form" class="sheet-create"><div><label for="sheet-name">New Sheet name</label><input id="sheet-name" value="My invoices" required maxlength="100" /></div><button id="create-sheet" class="iv-button iv-primary" type="submit">Create private Sheet</button></form>
+                <div class="sheet-existing"><div><label for="existing-sheet">Existing invoice workbook</label><select id="existing-sheet"><option value="">Choose a workbook</option></select></div><button id="use-existing-sheet" class="iv-button" type="button" disabled>Use Sheet</button></div>
+                <button id="choose-sheet" class="iv-text-button" type="button" disabled>Choose from Google Drive</button>
+                <p class="field-help">Keep General access set to Restricted. Share with another person as an Editor to let them use this workbook.</p>
+              </div>
+              <div id="sheet-connected" hidden><div class="iv-sheet-name"><Icon name="sheet" /><div><strong id="connected-sheet-name"></strong><a id="open-sheet" target="_blank" rel="noopener noreferrer">Open Google Sheet<Icon name="external" /></a></div><span class="iv-small-badge iv-badge-paid">Private</span></div><div class="sheet-actions"><button id="refresh-sheet" class="iv-text-button" type="button">Refresh records</button><button id="change-sheet" class="iv-text-button" type="button">Change Sheet</button></div></div>
+            </section>
+            <section id="business-defaults" class="iv-setting-section" aria-labelledby="business-heading">
+              <h2 id="business-heading">Business details</h2>
+              <p class="field-help">Saved in this Sheet and used for new invoices. Each Sheet has its own business profile.</p>
+              <form id="business-form">
+                <div class="iv-field"><label for="seller-name">Business name</label><input id="seller-name" name="sellerName" maxlength="120" required /></div>
+                <div class="iv-field"><label for="seller-address">Business address</label><textarea id="seller-address" name="sellerAddress" rows="2" maxlength="240"></textarea></div>
+                <div class="iv-meta-grid"><div><label for="seller-contact">Contact name</label><input id="seller-contact" name="sellerContact" maxlength="50" /></div><div><label for="seller-phone">Business phone</label><input id="seller-phone" name="sellerPhone" type="tel" maxlength="60" /></div></div>
+                <div class="iv-meta-grid"><div><label for="seller-email">Business email</label><input id="seller-email" name="sellerEmail" type="email" maxlength="120" /></div><div><label for="seller-registration">UEN / registration</label><input id="seller-registration" name="sellerRegistration" maxlength="80" /></div></div>
+                <div class="iv-field"><label for="seller-payment">Payment instructions</label><textarea id="seller-payment" name="sellerPayment" rows="2" maxlength="800" placeholder="PayNow number and account name"></textarea></div>
+                <div class="iv-field"><label for="seller-terms">Invoice footer</label><textarea id="seller-terms" name="sellerTerms" rows="2" maxlength="240"></textarea></div>
+                <div class="iv-field"><label for="seller-review-url">Review link (optional)</label><input id="seller-review-url" name="sellerReviewUrl" type="url" maxlength="1000" placeholder="https://…" /><p class="field-help">Included in the WhatsApp message when filled in.</p></div>
+                <button id="save-business-defaults" class="iv-button" type="submit" hidden>Save business details</button><p id="business-save-status" class="field-help" role="status"></p>
+              </form>
+            </section>
+            <details class="iv-notes"><summary>This device</summary><div class="device-actions"><button id="clear-device" class="iv-text-button" type="button">Clear this tab’s data</button></div></details>
+          </section>
+          <section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>
+            <div class="iv-title-row"><h1 id="result-heading" tabindex="-1">Invoice ready</h1><button id="edit-invoice" class="iv-text-button" type="button">Back to invoice</button></div>
+            <div class="pdf-file"><Icon name="invoice" /><div><strong id="result-filename"></strong><p id="result-description"></p></div><span id="result-payment-status" class="iv-small-badge"></span></div>
+            <p id="sheet-save-status" class="field-help" role="status"></p>
+            <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button"><Icon name="share" /><span>Share PDF</span></button><a id="view-pdf" class="iv-button" target="_blank" rel="noopener">View PDF<Icon name="external" /></a><a id="download-pdf" class="iv-button" download>Download<Icon name="download" /></a></div>
+            <p id="share-help" class="field-help"></p><p id="share-status" class="field-help" role="status"></p>
+            <details class="iv-notes summary-area"><summary>WhatsApp message</summary><label class="sr-only" for="whatsapp-summary">WhatsApp summary</label><textarea id="whatsapp-summary" rows="7" readonly></textarea><div class="summary-actions"><button id="copy-summary" class="iv-text-button" type="button"><Icon name="copy" />Copy message</button><a id="open-whatsapp" class="iv-text-button" target="_blank" rel="noopener noreferrer">Open WhatsApp<Icon name="external" /></a></div></details>
+          </section>
+        </div>
+      </main>
+    </div>
+    <template id="item-template"><div class="iv-item invoice-item"><div><label class="description-label">Description</label><input class="item-description" placeholder="Item or service description" maxlength="240" required /></div><div><label class="quantity-label">Qty</label><input class="item-quantity" type="number" inputmode="numeric" min="1" max="999" step="1" required /></div><div><label class="price-label">Unit price</label><input class="item-price" type="number" inputmode="decimal" min="0" max="9999999.99" step="0.01" placeholder="0.00" required /></div><div class="line-total"><span>Amount</span><strong class="iv-item-total">S$0.00</strong></div><button class="iv-remove remove-item" type="button" aria-label="Remove item"><Icon name="trash" /></button></div></template>
+    <script>import '../lib/invoice-client.mjs';</script>
+  </body>
+</html>

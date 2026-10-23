@@ -1,0 +1,20 @@
+{
+  "name": "sheetinvoice",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "7.4.2",
+    "lucide": "1.61.0",
+    "pdf-lib": "1.17.1"
+  },
+  "license": "MIT"
+}
