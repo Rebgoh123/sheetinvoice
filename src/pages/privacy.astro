@@ -30,7 +30,7 @@ const canonical = Astro.site ? new URL(`${base}privacy/`, Astro.site).href : nul
           <ul>
             <li>Google handles sign-in. The app uses your Google account ID and verified email to identify the connection; it never receives your Google password.</li>
             <li>The app lists invoice workbooks already available to it and checks file metadata, edit permissions and sharing settings. It reads business defaults, invoice design settings, saved item descriptions and prices, customers, invoices and items from the Sheet you connect.</li>
-            <li>Creating a workbook or saving business details, customers, invoices and payment updates sends those changes directly to Google's APIs. The app uses <a href="https://developers.google.com/workspace/drive/api/guides/api-specific-auth">Google's per-file permission</a> for app-created or explicitly chosen files, rather than requesting access to your entire Drive.</li>
+            <li>Creating a workbook or saving business details, customers, invoices, payment updates and transaction deletions sends those changes directly to Google's APIs. The app uses <a href="https://developers.google.com/workspace/drive/api/guides/api-specific-auth">Google's per-file permission</a> for app-created or explicitly chosen files, rather than requesting access to your entire Drive.</li>
           </ul>
           <p>Keep your Sheet's General access Restricted. Its sharing permissions determine who can access it; SheetInvoice checks these permissions before loading or saving.</p>
 
@@ -51,6 +51,7 @@ const canonical = Astro.site ? new URL(`${base}privacy/`, Astro.site).href : nul
             <li><strong>Disconnect</strong> or <strong>Clear this device’s data</strong> clears the app’s connection, temporary token, loaded records, current draft, defaults and generated files, and removes the remembered draft/defaults and Sheet IDs from local storage. Other open SheetInvoice tabs are also cleared; suspended tabs clear when resumed. Your Google Sheet is unchanged.</li>
             <li>Token expiry keeps your remembered draft and defaults. If the app detects revoked access or unsuitable Sheet sharing, it clears the remembered data. Connecting a different Google account clears the previous account’s working data before loading another workbook.</li>
             <li>You can revoke Google access through <a href="https://myaccount.google.com/connections">Google Account connections</a>. To edit or remove saved records, manage the workbook in Google Sheets or Drive.</li>
+            <li>Deleting a transaction removes it from app history by adding a deletion revision. Earlier invoice and item rows remain in your Sheet for recovery and invoice numbering; this does not permanently erase them. The last deletion can be undone during the current connection.</li>
             <li>Saved invoices and their revisions contain historical details. Editing a customer or business profile does not erase those earlier snapshots. Disconnecting or revoking access cannot recall downloaded files, copied messages or copies you have shared.</li>
           </ul>
           <p>You can inspect the implementation in the <a href="https://github.com/Rebgoh123/sheetinvoice">public source repository</a>. A separately hosted or modified fork may handle data differently; review that host's notice and source.</p>

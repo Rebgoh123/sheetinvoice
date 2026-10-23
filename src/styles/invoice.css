@@ -81,7 +81,7 @@ body { margin:0; }
   .invoice-app .iv-status-filters button { border:0; border-radius:4px; padding:7px 15px; min-height:35px; background:transparent; color:var(--iv-muted); font-size:12px; }
   .invoice-app .iv-status-filters button[aria-pressed=true] { background:var(--iv-surface); color:var(--iv-text); box-shadow:0 1px 3px #183b2712; }
   .invoice-app .iv-history-summary { margin:24px 0 14px; color:var(--iv-muted); font-size:12px; }
-  .invoice-app .iv-history-head,.invoice-app .iv-history-row { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1.4fr) 85px 66px 132px; gap:12px; align-items:center; }
+  .invoice-app .iv-history-head,.invoice-app .iv-history-row { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1.4fr) 85px 66px 180px; gap:12px; align-items:center; }
   .invoice-app .iv-history-head { padding-bottom:11px; color:var(--iv-muted); font-size:11px; }
   .invoice-app .iv-history-row { border-top:1px solid var(--iv-line); padding:16px 0; }
   .invoice-app .iv-history-id>strong,.invoice-app .iv-history-customer>strong { font-size:12px; font-weight:500; display:block; overflow-wrap:anywhere; }
@@ -90,7 +90,7 @@ body { margin:0; }
   .invoice-app .iv-small-badge { display:inline-block; font-size:10px; font-weight:500; border-radius:4px; padding:3px 7px; white-space:nowrap; }
   .invoice-app .iv-badge-paid { color:var(--iv-paid-text); background:var(--iv-paid-bg); }
   .invoice-app .iv-badge-unpaid { color:var(--iv-unpaid-text); background:var(--iv-unpaid-bg); }
-  .invoice-app .iv-history-actions { display:flex; gap:11px; justify-content:end; }
+  .invoice-app .iv-history-actions { display:flex; flex-wrap:wrap; gap:11px; justify-content:end; }
   .invoice-app .iv-history-actions button { font-size:11px; min-height:40px; }
   .invoice-app .iv-empty { text-align:center; padding:45px 0; color:var(--iv-muted); }
   .invoice-app .iv-right { text-align:right; }
@@ -187,8 +187,16 @@ body { margin:0; }
 .invoice-app #result-heading { margin-bottom:20px; overflow-wrap:anywhere; }
 .invoice-app .iv-export-format { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:20px; font-size:12px; }
 .invoice-app .iv-export-format .field-help { margin:0; }
-.invoice-app .iv-business-update { margin-top:16px; padding:14px; border:1px solid var(--iv-line); border-radius:6px; }
-.invoice-app .iv-business-update .iv-button { margin-top:10px; }
+.invoice-app .iv-preview-profile { margin-top:12px; }
+.invoice-app .iv-sheet-choice { margin-top:20px; }
+.invoice-app .iv-sheet-choice h3 { font-size:14px; margin:0 0 12px; }
+.invoice-app .iv-sheet-choice .sheet-existing { margin-bottom:12px; }
+.invoice-app .iv-danger-text { color:#a13c31; }
+.invoice-app .iv-danger { color:white; background:#a13c31; border-color:#a13c31; }
+.invoice-app .iv-dialog { width:calc(100% - 32px); max-width:420px; padding:24px; border:1px solid var(--iv-line); border-radius:10px; color:var(--iv-text); }
+.invoice-app .iv-dialog::backdrop { background:#15252270; }
+.invoice-app .iv-dialog h2 { font-size:19px; margin-bottom:12px; }
+.invoice-app .iv-dialog .sheet-actions { justify-content:end; margin-top:24px; }
 .invoice-app .pdf-file { display:flex; align-items:center; gap:15px; padding:20px 0; border-block:1px solid var(--iv-line); }
 .invoice-app .pdf-file>svg { width:30px; height:30px; color:var(--iv-accent); flex-shrink:0; }
 .invoice-app .pdf-file>div { flex:1; min-width:0; overflow-wrap:anywhere; }

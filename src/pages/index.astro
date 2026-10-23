@@ -77,12 +77,13 @@ const googleConfig = {
               <div><label for="history-customer">Customer</label><select id="history-customer" disabled><option value="">All customers</option></select></div>
               <div><span id="history-status-label" class="field-label">Payment status</span><div class="iv-status-filters" role="group" aria-labelledby="history-status-label"><button type="button" data-status="all" aria-pressed="true">All</button><button type="button" data-status="unpaid" aria-pressed="false">Unpaid</button><button type="button" data-status="paid" aria-pressed="false">Paid</button></div></div>
             </div>
+            <p id="history-feedback" class="iv-feedback" role="status" hidden></p><button id="undo-delete" class="iv-text-button" type="button" hidden>Undo deletion</button>
             <p id="history-summary" class="iv-history-summary" role="status"></p>
             <div id="history-head" class="iv-history-head" aria-hidden="true"><span>Invoice / date</span><span>Customer / service</span><span class="iv-right">Amount</span><span>Status</span><span></span></div>
             <ul id="history-list" class="history-list" aria-label="Saved transactions"></ul>
             <p id="history-empty" class="iv-empty">No saved invoices yet.</p>
             <div id="history-pagination" class="history-pagination" hidden><button id="history-previous" class="iv-text-button" type="button">Previous</button><span id="history-page" role="status"></span><button id="history-next" class="iv-text-button" type="button">Next</button></div>
-            <p id="history-feedback" class="iv-feedback" role="status" hidden></p>
+            <dialog id="delete-transaction" class="iv-dialog" aria-labelledby="delete-transaction-heading" aria-describedby="delete-transaction-description"><h2 id="delete-transaction-heading">Delete transaction?</h2><p id="delete-transaction-description"></p><div class="sheet-actions"><button id="cancel-delete" class="iv-button" type="button" autofocus>Cancel</button><button id="confirm-delete" class="iv-button iv-danger" type="button">Delete transaction</button></div></dialog>
           </section>
           <section id="settings-panel" class="iv-panel" aria-labelledby="settings-heading" hidden>
             <div class="iv-title-row"><h1 id="settings-heading">Settings</h1><button id="settings-done" class="iv-text-button" type="button">Done<Icon name="check" /></button></div>
@@ -93,15 +94,20 @@ const googleConfig = {
               <p id="google-session-status" class="field-help" role="status" hidden>This browser could not remember the Google connection for this tab. Refreshing may require reconnecting.</p>
               <p class="field-help">Records stay in your Sheet. Drafts are remembered on this device. <a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></p>
               <div id="sheet-setup" hidden>
-                <form id="create-sheet-form" class="sheet-create"><div><label for="sheet-name">New Sheet name</label><input id="sheet-name" value="My invoices" required maxlength="100" /></div><button id="create-sheet" class="iv-button iv-primary" type="submit">Create private Sheet</button></form>
-                <details id="existing-sheet-options" class="iv-notes"><summary>Use an existing Sheet</summary><div class="sheet-existing"><div><label for="existing-sheet">Invoice Sheet</label><select id="existing-sheet"><option value="">Choose a workbook</option></select></div><button id="use-existing-sheet" class="iv-button" type="button" disabled>Use Sheet</button></div><button id="choose-sheet" class="iv-text-button" type="button" disabled>Choose from Google Drive</button><p class="field-help">Choose a Sheet created with SheetInvoice. It must have General access set to Restricted.</p></details>
+                <div id="existing-sheet-options" class="iv-sheet-choice">
+                  <h3>Select your Sheet</h3>
+                  <div id="known-sheet-options" class="sheet-existing" hidden><div><label for="existing-sheet">Your invoice Sheets</label><select id="existing-sheet"><option value="">Choose a workbook</option></select></div><button id="use-existing-sheet" class="iv-button iv-primary" type="button" disabled>Use Sheet</button></div>
+                  <button id="choose-sheet" class="iv-button" type="button" disabled>Choose from Google Drive</button>
+                  <p class="field-help">Choose an existing SheetInvoice workbook. Its General access must be Restricted.</p>
+                </div>
+                <details id="new-sheet-options" class="iv-notes"><summary>Starting fresh? Create a new Sheet</summary><form id="create-sheet-form" class="sheet-create"><div><label for="sheet-name">New Sheet name</label><input id="sheet-name" value="My invoices" required maxlength="100" /></div><button id="create-sheet" class="iv-button" type="submit">Create private Sheet</button></form></details>
               </div>
               <div id="sheet-connected" hidden><div class="iv-sheet-name"><Icon name="sheet" /><div><strong id="connected-sheet-name"></strong><a id="open-sheet" target="_blank" rel="noopener noreferrer">Open Google Sheet<Icon name="external" /></a></div><span class="iv-small-badge iv-badge-paid">Private</span></div><button id="refresh-sheet" class="iv-text-button" type="button">Refresh records</button></div>
               <details id="connection-options" class="iv-notes" hidden><summary>Connection options</summary><div class="sheet-actions"><button id="change-sheet" class="iv-text-button" type="button" hidden>Change Sheet</button><button id="disconnect-google" class="iv-text-button" type="button" hidden>Disconnect</button></div></details>
             </section>
             <details id="business-defaults" class="iv-setting-section iv-settings-details" aria-labelledby="business-heading">
               <summary><h2 id="business-heading">Business details</h2></summary>
-              <p class="field-help">Your details for new invoices. Saved in your Sheet.</p>
+              <p class="field-help">Saved in your Sheet. Used automatically when opening or generating any invoice.</p>
               <form id="business-form">
                 <div class="iv-field"><label for="seller-name">{SELLER_FIELDS.name.label}</label><input id="seller-name" name="sellerName" maxlength={SELLER_FIELDS.name.limit} required /></div>
                 <div class="iv-field"><label for="seller-address">{SELLER_FIELDS.address.label}</label><textarea id="seller-address" name="sellerAddress" rows="2" maxlength={SELLER_FIELDS.address.limit}></textarea></div>
@@ -143,7 +149,7 @@ const googleConfig = {
             <h1 id="result-heading" tabindex="-1">Invoice ready</h1>
             <div class="pdf-file"><Icon name="invoice" /><div><strong id="result-filename"></strong><p id="result-description"></p></div><span id="result-payment-status" class="iv-small-badge"></span></div>
             <p id="sheet-save-status" class="field-help" role="status"></p>
-            <div id="invoice-business-update" class="iv-business-update" hidden><p id="invoice-business-message" class="field-help" role="status"></p><button id="update-invoice-business" class="iv-button" type="button">Use latest business details &amp; save</button></div>
+            <p class="field-help iv-preview-profile">Uses your latest business details, labels and signature.</p>
             <div class="iv-export-format"><span id="result-format-label">File format</span><div class="iv-status-filters" role="group" aria-labelledby="result-format-label"><button type="button" data-export-format="pdf" aria-pressed="true">PDF</button><button type="button" data-export-format="jpg" aria-pressed="false">JPG</button></div><span id="result-format-status" class="field-help" role="status"></span></div>
             <p id="result-error" class="notice" role="alert" hidden></p>
             <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button"><Icon name="share" /><span>Share PDF</span></button><a id="download-pdf" class="iv-button" download><span>Download</span><Icon name="download" /></a></div>

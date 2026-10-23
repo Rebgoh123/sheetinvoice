@@ -77,7 +77,12 @@ export function parseWorkbook(metadata, ranges) {
   const latest = new Map();
   for (const values of tables.Invoices) {
     if (!uuidPattern.test(values[0] || '') || !uuidPattern.test(values[1] || '')) continue;
-    const invoice = restoreDraft(JSON.stringify({ version: 1, invoice: safeJson(values[9]) }));
+    const snapshot = safeJson(values[9]);
+    if (snapshot?.deleted === true) {
+      latest.set(values[0], { id: values[0], revision: values[1], deleted: true });
+      continue;
+    }
+    const invoice = restoreDraft(JSON.stringify({ version: 1, invoice: snapshot }));
     if (invoice && !validateInvoice(invoice).length) latest.set(values[0], { id: values[0], revision: values[1], customerId: values[5], savedAt: values[2], invoice });
   }
   const customers = new Map();
@@ -87,7 +92,8 @@ export function parseWorkbook(metadata, ranges) {
   }
   return { id: metadata.spreadsheetId, name: metadata.properties.title, tabs, tables, seller, numberStart, numberingWarning: invoiceNumberStartError(numberStart), design: design.value, designWarning: design.warning, savedItems: catalog.items, savedItemsWarning: catalog.warning,
     customers: [...customers.values()].sort((a, b) => a.name.localeCompare(b.name)),
-    invoices: [...latest.values()].reverse() };
+    invoices: [...latest.values()].filter(record => !record.deleted).reverse(),
+    deletedInvoices: [...latest.values()].filter(record => record.deleted) };
 }
 function safeJson(value) { try { return JSON.parse(value); } catch { return null; } }
 
@@ -121,7 +127,7 @@ export function planSave(workbook, { id, revision, baseRevision, customerId, inv
   if (!uuidPattern.test(id || '') || !uuidPattern.test(revision || '')) throw new SheetsError('Invalid invoice record.', 'validation');
   const errors = validateInvoice(invoice);
   if (errors.length) throw new SheetsError(errors.join(' '), 'validation');
-  const existing = workbook.invoices.find(record => record.id === id);
+  const existing = [...workbook.invoices, ...workbook.deletedInvoices].find(record => record.id === id);
   const conflict = () => new SheetsError('This invoice changed on another device. Your edits are still here. Refresh records and reopen the latest invoice before saving.', 'conflict');
   const savedRevision = workbook.tables.Invoices.find(values => values[0] === id && values[1] === revision);
   if (savedRevision) {
@@ -145,6 +151,17 @@ export function planSave(workbook, { id, revision, baseRevision, customerId, inv
     writeRow(workbook.tabs.Invoices, [id, revision, savedAt, snapshot.number, snapshot.date, nextCustomerId, snapshot.customer.name.trim(), invoiceTotal(snapshot), `[${snapshot.status.toUpperCase()}] ${snapshot.items.map(item => item.description).join('; ')}`, invoiceJson])];
   requests.push({ appendCells: { sheetId: workbook.tabs['Invoice items'], fields: 'userEnteredValue', rows: snapshot.items.map((item, index) => row([id, revision, index + 1, item.description, Number(item.quantity), lineTotal({ ...item, quantity: '1' }), lineTotal(item)])) } });
   return { requests, customerId: nextCustomerId };
+}
+
+export function planDelete(workbook, { id, revision, baseRevision }, now = new Date()) {
+  if (!uuidPattern.test(id || '') || !uuidPattern.test(revision || '')) throw new SheetsError('Invalid invoice record.', 'validation');
+  const existing = [...workbook.invoices, ...workbook.deletedInvoices].find(record => record.id === id);
+  if (existing?.deleted && existing.revision === revision) return [];
+  if (!existing || existing.deleted || existing.revision !== baseRevision) throw new SheetsError('This transaction changed on another device. Refresh records before deleting it.', 'conflict');
+  const snapshot = existing.invoice;
+  // Append a deletion revision. Retain earlier rows for recovery and invoice numbering.
+  return [writeRow(workbook.tabs.Invoices, [id, revision, now.toISOString(), snapshot.number, snapshot.date, existing.customerId,
+    snapshot.customer.name, invoiceTotal(snapshot), '[DELETED]', JSON.stringify({ deleted: true })])];
 }
 
 export class InvoiceSheets {
@@ -245,6 +262,12 @@ export class InvoiceSheets {
     }
     if (plan.requests.length) await this.request(`${SHEETS}/${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: plan.requests }) });
     return { customerId: plan.customerId, workbook: await this.load(id) };
+  }
+  async deleteInvoice(id, record) {
+    const current = await this.load(id);
+    const requests = planDelete(current, record);
+    if (requests.length) await this.request(`${SHEETS}/${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests }) });
+    return this.load(id);
   }
   async saveSeller(id, seller, numberStart) {
     const errors = validateSeller(seller);
