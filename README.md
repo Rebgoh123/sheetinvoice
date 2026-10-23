@@ -153,3 +153,13 @@ This first version uses SGD, Singapore date/phone defaults, integer-cent totals 
 ## License
 
 MIT. Dependencies retain their respective licenses.
+
+## Source guide
+
+- `src/pages/index.astro` provides the page shell and public Google configuration. Invoice, transaction, settings and preview markup live in `src/components/`.
+- `src/lib/invoice-client.mjs` coordinates the working draft, navigation and async actions. Transaction rows and item rows use HTML templates in their components.
+- `src/lib/invoice.mjs` owns invoice normalization, validation, totals and messages. `SELLER_FIELDS` defines business fields; `printed: false` marks message-only settings. `WHATSAPP_FIELDS` supplies both template buttons and their values.
+- `src/lib/invoice-sheets.mjs` owns workbook schemas, Google requests and revision/conflict handling. `invoice-storage.mjs` owns device and temporary session storage.
+- `src/lib/invoice-export.mjs` shares PDF/JPG layout; message-only updates reuse existing files. `src/styles/invoice.css` contains shared styles followed by grouped responsive rules.
+
+Keep component element IDs aligned with the client controls. Workbook schemas and legacy profile conversions preserve existing users' data.

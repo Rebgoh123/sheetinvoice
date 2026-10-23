@@ -16,8 +16,8 @@ export const SELLER_FIELDS = {
   terms: { label: 'Invoice footer', id: 'seller-terms', limit: 240 },
   signature: { label: 'Authorised signature', id: 'seller-signature', limit: 60 },
   signatureImage: { label: 'Signature image', id: 'seller-signature-image', limit: MAX_SIGNATURE_LENGTH, isImage: true },
-  messageTemplate: { label: 'WhatsApp message template (optional)', sheetKey: 'WhatsApp message template', id: 'seller-message-template', limit: 3000 },
-  reviewUrl: { label: 'Review link (optional)', sheetKey: 'Review link', id: 'seller-review-url', limit: 1000 },
+  messageTemplate: { label: 'WhatsApp message template (optional)', sheetKey: 'WhatsApp message template', id: 'seller-message-template', limit: 3000, printed: false },
+  reviewUrl: { label: 'Review link (optional)', sheetKey: 'Review link', id: 'seller-review-url', limit: 1000, printed: false },
 };
 export const defaultSeller = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.default ?? '']));
 export const sellerLimits = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.limit]));
@@ -33,6 +33,10 @@ export function normalizeSeller(source) {
     if (field.isImage) return [key, normalizeSignatureImage(value)];
     return [key, (field.isLabel ? value.replace(/\s+/g, ' ').trim() : value).slice(0, field.limit)];
   }));
+}
+export function sameSeller(left, right, { printedOnly = false } = {}) {
+  const a = normalizeSeller(left), b = normalizeSeller(right);
+  return Object.entries(SELLER_FIELDS).every(([key, field]) => (printedOnly && field.printed === false) || a[key] === b[key]);
 }
 export function sellerHeaderLines(source) {
   const seller = normalizeSeller(source);
@@ -60,11 +64,10 @@ export function validateSeller(seller) {
   return errors;
 }
 
-export function singaporeDate(now = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Singapore", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(now);
-}
+const singaporeDateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore', year: 'numeric', month: '2-digit', day: '2-digit' });
+const displayDateFormatter = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Singapore' });
+const moneyFormatter = new Intl.NumberFormat('en-SG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const singaporeDate = (now = new Date()) => singaporeDateFormatter.format(now);
 
 export function newInvoice(seller = defaultSeller, now = new Date(), design) {
   const suffix = globalThis.crypto.randomUUID().slice(0, 6).toUpperCase();
@@ -111,6 +114,13 @@ export function priceInCents(value) {
   return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
 }
 
+export function normalizeSavedItem(source) {
+  if (!['description', 'quantity', 'price'].every(key => typeof source?.[key] === 'string')) return null;
+  const description = source.description.trim(), quantity = source.quantity, price = source.price.trim();
+  if (!description || description.length > 240 || !/^\d{1,3}$/.test(quantity) || Number(quantity) < 1 || (price && priceInCents(price) === null)) return null;
+  return { description, quantity, price };
+}
+
 export function lineTotal(item) {
   const cents = priceInCents(item.price);
   const quantity = String(item.quantity);
@@ -119,10 +129,8 @@ export function lineTotal(item) {
 }
 
 export const invoiceTotal = (invoice) => invoice.items.reduce((sum, item) => sum + (lineTotal(item) ?? 0), 0);
-export const formatMoney = (cents) => `S$${(cents / 100).toLocaleString("en-SG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-export const displayDate = (date) => new Intl.DateTimeFormat("en-SG", {
-  day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Singapore",
-}).format(new Date(`${date}T12:00:00+08:00`));
+export const formatMoney = cents => `S$${moneyFormatter.format(cents / 100)}`;
+export const displayDate = date => displayDateFormatter.format(new Date(`${date}T12:00:00+08:00`));
 
 export function whatsappNumber(value) {
   const input = String(value).trim();
@@ -191,11 +199,14 @@ export const WHATSAPP_FIELDS = {
 export function invoiceSummary(invoice) {
   const template = invoice.seller.messageTemplate?.trim();
   if (!template) return standardInvoiceSummary(invoice);
+  const values = new Map();
   // Replace once, so braces in customer names or other values stay literal.
   return template.replace(/\{\{|\}\}|\{([a-z_]+)\}/g, (match, key) => {
     if (match === '{{') return '{';
     if (match === '}}') return '}';
-    return Object.hasOwn(WHATSAPP_FIELDS, key) ? WHATSAPP_FIELDS[key].value(invoice) : match;
+    if (!Object.hasOwn(WHATSAPP_FIELDS, key)) return match;
+    if (!values.has(key)) values.set(key, WHATSAPP_FIELDS[key].value(invoice));
+    return values.get(key);
   });
 }
 
@@ -211,24 +222,20 @@ export function invoiceFilename(invoice, format = 'pdf', page = null) {
 }
 
 // Only restore the shape we own, with length limits; stored data never becomes HTML.
-export function restoreDraft(raw, { preserveLegacyLabels = true } = {}) {
-  try {
-    const saved = JSON.parse(raw);
-    if (saved.version !== 1 || !saved.invoice || !Array.isArray(saved.invoice.items)) return null;
-    const source = saved.invoice;
-    if (source.status !== undefined && !['unpaid', 'paid'].includes(source.status)) return null;
-    const take = (value, max, fallback = "") => typeof value === "string" ? value.slice(0, max) : fallback;
-    return {
-      number: take(source.number, 70), date: take(source.date, 10),
-      status: source.status || 'unpaid',
-      customer: { name: take(source.customer?.name, 120), phone: take(source.customer?.phone, 40), address: take(source.customer?.address, 400) },
-      seller: normalizeSeller({ ...source.seller, ...(preserveLegacyLabels ? {
-        // Historical snapshots predate configurable labels; retain their printed wording.
-        phoneLabel: source.seller?.phoneLabel ?? '', registrationLabel: source.seller?.registrationLabel ?? 'Registration',
-      } : {}) }),
-      design: normalizeDesign(source.design),
-      items: source.items.slice(0, MAX_ITEMS).map((item) => ({ description: take(item?.description, 240), quantity: take(item?.quantity, 3, "1"), price: take(item?.price, 10) })),
-      notes: take(source.notes, 1200),
-    };
-  } catch { return null; }
+export function normalizeInvoice(source, { preserveLegacyLabels = true } = {}) {
+  if (!source || !Array.isArray(source.items)) return null;
+  if (source.status !== undefined && !['unpaid', 'paid'].includes(source.status)) return null;
+  const take = (value, max, fallback = "") => typeof value === "string" ? value.slice(0, max) : fallback;
+  return {
+    number: take(source.number, 70), date: take(source.date, 10),
+    status: source.status || 'unpaid',
+    customer: { name: take(source.customer?.name, 120), phone: take(source.customer?.phone, 40), address: take(source.customer?.address, 400) },
+    seller: normalizeSeller({ ...source.seller, ...(preserveLegacyLabels ? {
+      // Historical snapshots predate configurable labels; retain their printed wording.
+      phoneLabel: source.seller?.phoneLabel ?? '', registrationLabel: source.seller?.registrationLabel ?? 'Registration',
+    } : {}) }),
+    design: normalizeDesign(source.design),
+    items: source.items.slice(0, MAX_ITEMS).map((item) => ({ description: take(item?.description, 240), quantity: take(item?.quantity, 3, "1"), price: take(item?.price, 10) })),
+    notes: take(source.notes, 1200),
+  };
 }

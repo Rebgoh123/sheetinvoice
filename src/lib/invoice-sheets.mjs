@@ -1,4 +1,4 @@
-import { SELLER_FIELDS, normalizeSeller, sellerLimits, priceInCents, restoreDraft, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber, invoiceNumberStartError, messageTemplateFromPrefix } from './invoice.mjs';
+import { SELLER_FIELDS, normalizeSeller, sellerLimits, normalizeSavedItem, normalizeInvoice, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber, invoiceNumberStartError, messageTemplateFromPrefix } from './invoice.mjs';
 import { DESIGN_SETTINGS, normalizeDesign, validateDesign } from './invoice-design.mjs';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -85,7 +85,7 @@ export function parseWorkbook(metadata, ranges) {
       latest.set(values[0], { id: values[0], revision: values[1], deleted: true });
       continue;
     }
-    const invoice = restoreDraft(JSON.stringify({ version: 1, invoice: snapshot }));
+    const invoice = normalizeInvoice(snapshot);
     if (invoice && !validateInvoice(invoice).length) latest.set(values[0], { id: values[0], revision: values[1], customerId: values[5], savedAt: values[2], invoice });
   }
   const customers = new Map();
@@ -118,9 +118,9 @@ function parseSavedItems(values) {
     if (!row.some(value => String(value ?? '').trim())) continue;
     nonempty++;
     if (nonempty > 100) continue;
-    const description = String(row[0] ?? '').trim(), quantity = String(row[1] ?? '').trim() || '1', price = String(row[2] ?? '').trim();
-    if (!description || description.length > 240 || !/^\d{1,3}$/.test(quantity) || Number(quantity) < 1 || (price && priceInCents(price) === null)) { invalid++; continue; }
-    items.push({ description, quantity, price });
+    const item = normalizeSavedItem({ description: String(row[0] ?? ''), quantity: String(row[1] ?? '').trim() || '1', price: String(row[2] ?? '') });
+    if (item) items.push(item);
+    else invalid++;
   }
   const warning = [invalid ? `${invalid} saved item ${invalid === 1 ? 'row was' : 'rows were'} skipped. Use a description up to 240 characters, quantity 1–999 and a price with up to two decimal places (or blank).` : '', nonempty > 100 ? 'Only the first 100 saved item rows are loaded.' : ''].filter(Boolean).join(' ');
   return { items, warning };
@@ -208,8 +208,14 @@ export class InvoiceSheets {
   }
   async list() {
     const query = new URLSearchParams({ q: `trashed = false and mimeType = 'application/vnd.google-apps.spreadsheet' and (appProperties has { key='sheetInvoice' and value='${WORKBOOK_VERSION}' } or appProperties has { key='nlsInvoice' and value='nls-invoice-v1' })`, fields: 'files(id,name),nextPageToken', pageSize: '100' });
-    const result = await this.request(`${DRIVE}?${query}`);
-    return result.files || [];
+    const files = [];
+    let page;
+    do {
+      page = await this.request(`${DRIVE}?${query}`);
+      files.push(...(page.files || []));
+      if (page.nextPageToken) query.set('pageToken', page.nextPageToken);
+    } while (page.nextPageToken);
+    return files;
   }
   async load(id) {
     await this.privateFile(id);
@@ -287,8 +293,6 @@ export class InvoiceSheets {
     await this.request(`${SHEETS}/${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: [request] }) });
     return this.load(id);
   }
-  async setupSavedItems(id) { return this.setupOptionalTab(id, SAVED_ITEMS_TAB); }
-  async setupDesign(id) { return this.setupOptionalTab(id, DESIGN_TAB); }
   async setupOptionalTab(id, title) {
     if (!Object.hasOwn(optionalTables, title)) throw new SheetsError('Unknown invoice tab.', 'validation');
     const current = await this.load(id);

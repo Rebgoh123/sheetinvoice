@@ -1,0 +1,37 @@
+---
+import Icon from './InvoiceIcon.astro';
+---
+<section id="invoice-panel" class="iv-panel" role="tabpanel" aria-labelledby="invoice-tab">
+  <div class="iv-title-row"><div class="iv-title"><h1 id="invoice-heading">New invoice</h1><span id="draft-status" class="draft-status" role="status" hidden></span></div><button id="new-invoice" class="iv-text-button" type="button">Reset<Icon name="reset" /></button><button id="close-edit" class="iv-text-button" type="button" aria-label="Close edit without saving and go back" title="Close edit without saving" hidden>Close<Icon name="close" /></button></div>
+  <div id="reset-feedback" class="iv-inline-feedback" hidden><span role="status">New invoice started.</span><button id="undo-reset" class="iv-text-button" type="button">Undo reset</button></div>
+  <div id="connect-hint" class="connect-hint"><span id="connect-hint-text">Keep your invoices in your own Sheet.</span><button class="iv-button iv-primary" type="button" data-connect-sheet disabled>Connect Google Sheet</button></div>
+  <div id="error-box" class="notice" role="alert" tabindex="-1" hidden></div>
+  <form id="invoice-form">
+    <div id="customer-mode" class="iv-status-filters iv-customer-mode" role="group" aria-label="Customer source" hidden><button type="button" data-customer-mode="saved" aria-pressed="false">Saved customer</button><button type="button" data-customer-mode="new" aria-pressed="true">New customer</button></div>
+    <div class="iv-customer-grid">
+      <div>
+        <label id="customer-label" for="customer-name">Customer name</label>
+        <div id="saved-customer-field" hidden><select id="saved-customer" name="savedCustomer" aria-labelledby="customer-label"><option value="">Choose a customer</option></select></div>
+        <div id="customer-name-field"><input id="customer-name" name="customerName" autocomplete="section-customer name" placeholder="Customer name" required maxlength="120" aria-labelledby="customer-label" /></div>
+      </div>
+      <div><label for="customer-phone">WhatsApp number</label><input id="customer-phone" name="customerPhone" type="tel" autocomplete="section-customer tel" placeholder="e.g. 9123 4567" maxlength="40" /></div>
+    </div>
+    <div class="iv-field"><label for="customer-address">Service address</label><textarea id="customer-address" name="customerAddress" rows="1" autocomplete="street-address" placeholder="Address for this job" maxlength="400"></textarea></div>
+    <details id="invoice-details" class="iv-notes iv-invoice-details"><summary>Invoice details<span id="invoice-details-summary"></span></summary><div class="iv-meta-grid"><div><label for="invoice-number">Invoice number</label><input id="invoice-number" name="invoiceNumber" maxlength="70" required /></div><div><label for="invoice-date">Date</label><input id="invoice-date" name="invoiceDate" type="date" required /></div></div></details>
+    <section class="iv-items" aria-labelledby="items-heading">
+      <section id="quick-items" class="iv-quick-items" aria-labelledby="quick-items-heading" hidden><h2 id="quick-items-heading">Saved items</h2><div id="saved-item-tags" class="iv-item-tags" role="group" aria-label="Tap to add saved items"></div><p id="quick-add-status" class="sr-only" role="status"></p></section>
+      <div class="iv-section-heading"><h2 id="items-heading">Items</h2><span>SGD</span></div>
+      <div class="iv-item-head" aria-hidden="true"><span>Description</span><span>Qty</span><span>Unit price</span><span class="iv-right">Amount</span><span></span></div>
+      <div id="items"></div>
+      <button id="add-item" class="iv-text-button iv-add-item" type="button"><Icon name="plus" />Add item</button>
+    </section>
+    <details id="invoice-notes" class="iv-notes"><summary>Add a note</summary><label class="sr-only" for="notes">Invoice notes</label><textarea id="notes" name="notes" rows="2" maxlength="1200" placeholder="Job notes or a message for the customer"></textarea></details>
+    <div class="iv-footer">
+      <div class="iv-total"><span>Total</span><strong id="action-total">S$0.00</strong></div>
+      <label class="iv-paid-check"><input id="payment-status" name="paid" type="checkbox" />Mark as paid</label>
+      <div class="iv-save-actions"><label class="iv-format-choice"><span class="sr-only">Invoice format</span><select id="export-format" name="exportFormat"><option value="pdf">PDF</option><option value="jpg">JPG</option></select></label><button id="save-invoice" class="iv-button" type="submit" name="action" value="save-only" disabled>Save</button><button id="generate-pdf" class="iv-button iv-primary" type="submit" name="action" value="export"><span>Generate PDF</span><Icon name="arrow" /></button></div>
+    </div>
+  </form>
+  <p id="invoice-save-status" class="iv-feedback" role="status" hidden></p>
+</section>
+<template id="item-template"><div class="iv-item invoice-item"><div><label class="description-label">Description</label><input class="item-description" placeholder="Item or service description" maxlength="240" required /></div><div><label class="quantity-label">Qty</label><input class="item-quantity" type="number" inputmode="numeric" min="1" max="999" step="1" required /></div><div><label class="price-label">Unit price</label><input class="item-price" type="number" inputmode="decimal" min="0" max="9999999.99" step="0.01" placeholder="0.00" required /></div><div class="line-total"><span>Amount</span><strong class="iv-item-total">S$0.00</strong></div><button class="iv-remove remove-item" type="button" aria-label="Remove item"><Icon name="trash" /></button></div></template>

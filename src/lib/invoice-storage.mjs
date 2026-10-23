@@ -1,4 +1,4 @@
-import { normalizeSeller, priceInCents, restoreDraft } from './invoice.mjs';
+import { normalizeSeller, normalizeSavedItem, normalizeInvoice } from './invoice.mjs';
 import { normalizeDesign } from './invoice-design.mjs';
 
 const KEY = 'sheetinvoice-device-v1';
@@ -47,15 +47,11 @@ export function loadDevice(storage) {
     if (!raw || raw.length > 150000) return null;
     const saved = JSON.parse(raw);
     if (saved.version !== 1) return null;
-    const invoice = restoreDraft(JSON.stringify({ version: 1, invoice: saved.invoice }), { preserveLegacyLabels: uuid(saved.baseRevision) });
+    const invoice = normalizeInvoice(saved.invoice, { preserveLegacyLabels: uuid(saved.baseRevision) });
     if (!invoice || !invoice.items.length) return null;
     const accountId = typeof saved.accountId === 'string' && /^[a-zA-Z0-9_-]{1,200}$/.test(saved.accountId) ? saved.accountId : null;
     const workbookId = accountId && fileId(saved.workbookId) ? saved.workbookId : null;
-    const items = Array.isArray(saved.savedItems) ? saved.savedItems.slice(0, 100).filter(item =>
-      typeof item?.description === 'string' && item.description.trim() && item.description.length <= 240 &&
-      typeof item.quantity === 'string' && /^\d{1,3}$/.test(item.quantity) && Number(item.quantity) >= 1 &&
-      typeof item.price === 'string' && (item.price === '' || priceInCents(item.price) !== null))
-      .map(({ description, quantity, price }) => ({ description, quantity, price })) : [];
+    const items = Array.isArray(saved.savedItems) ? saved.savedItems.slice(0, 100).map(normalizeSavedItem).filter(Boolean) : [];
     return { invoice, business: normalizeSeller(saved.business), design: normalizeDesign(saved.design), exportFormat: saved.exportFormat === 'jpg' ? 'jpg' : 'pdf',
       numberStart: typeof saved.numberStart === 'string' ? saved.numberStart.slice(0, 70) : '',
       automaticNumber: typeof saved.automaticNumber === 'string' && saved.automaticNumber === invoice.number ? invoice.number : null,
@@ -70,8 +66,11 @@ export function loadDevice(storage) {
 export function saveDevice(value, storage) {
   try {
     storage ??= globalThis.localStorage;
-    if (value) storage.setItem(KEY, JSON.stringify({ ...value, version: 1 }));
-    else storage.removeItem(KEY);
+    const next = value ? JSON.stringify({ ...value, version: 1 }) : null;
+    if (storage.getItem(KEY) !== next) {
+      if (next === null) storage.removeItem(KEY);
+      else storage.setItem(KEY, next);
+    }
     return true;
   } catch { return false; }
 }

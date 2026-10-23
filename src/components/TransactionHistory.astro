@@ -1,0 +1,32 @@
+---
+import Icon from './InvoiceIcon.astro';
+---
+<section id="history-panel" class="iv-panel" role="tabpanel" aria-labelledby="history-tab" hidden>
+  <div class="iv-title-row"><h1>Past transactions</h1><button id="history-new-invoice" class="iv-button iv-primary" type="button"><Icon name="plus" />New invoice</button></div>
+  <div id="history-connect" class="connect-hint"><span id="history-connect-text">Connect your Sheet to view transactions.</span><button class="iv-button iv-primary" type="button" data-connect-sheet disabled>Connect Google Sheet</button></div>
+  <div class="iv-history-filters">
+    <div><label for="history-customer">Customer</label><select id="history-customer" disabled><option value="">All customers</option></select></div>
+    <div><span id="history-status-label" class="field-label">Payment status</span><div class="iv-status-filters" role="group" aria-labelledby="history-status-label"><button type="button" data-status="all" aria-pressed="true">All</button><button type="button" data-status="unpaid" aria-pressed="false">Unpaid</button><button type="button" data-status="paid" aria-pressed="false">Paid</button></div></div>
+  </div>
+  <p id="history-feedback" class="iv-feedback" role="status" hidden></p><button id="undo-delete" class="iv-text-button" type="button" hidden>Undo deletion</button>
+  <p id="history-summary" class="iv-history-summary" role="status"></p>
+  <div id="history-head" class="iv-history-head" aria-hidden="true"><span>Invoice / date</span><span>Customer / service</span><span class="iv-right">Amount</span><span>Status</span><span></span></div>
+  <ul id="history-list" class="history-list" aria-label="Saved transactions"></ul>
+  <p id="history-empty" class="iv-empty">No saved invoices yet.</p>
+  <div id="history-pagination" class="history-pagination" hidden><button id="history-previous" class="iv-text-button" type="button">Previous</button><span id="history-page" role="status"></span><button id="history-next" class="iv-text-button" type="button">Next</button></div>
+  <dialog id="delete-transaction" class="iv-dialog" aria-labelledby="delete-transaction-heading" aria-describedby="delete-transaction-description"><h2 id="delete-transaction-heading">Delete transaction?</h2><p id="delete-transaction-description"></p><div class="sheet-actions"><button id="cancel-delete" class="iv-button" type="button" autofocus>Cancel</button><button id="confirm-delete" class="iv-button iv-danger" type="button">Delete transaction</button></div></dialog>
+</section>
+<template id="history-row-template">
+  <li class="iv-history-row">
+    <button class="iv-row-open" type="button" data-action="open"></button>
+    <div class="iv-history-id"><strong data-field="number"></strong><small data-field="date"></small></div>
+    <div class="iv-history-customer"><strong data-field="customer"></strong><small data-field="service"></small></div>
+    <div class="iv-history-amount" data-field="amount"></div>
+    <div class="iv-history-status"><span class="iv-small-badge" data-field="status"></span></div>
+    <div class="iv-history-actions">
+      <button class="iv-text-button iv-history-icon" type="button" data-action="edit"><Icon name="edit" /></button>
+      <button class="iv-text-button iv-history-pay" type="button" data-action="pay">Mark paid</button>
+      <button class="iv-text-button iv-danger-text iv-history-icon" type="button" data-action="delete"><Icon name="trash" /></button>
+    </div>
+  </li>
+</template>

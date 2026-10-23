@@ -1,0 +1,70 @@
+---
+import Icon from './InvoiceIcon.astro';
+import { SELLER_FIELDS, WHATSAPP_FIELDS } from '../lib/invoice.mjs';
+---
+<section id="settings-panel" class="iv-panel" aria-labelledby="settings-heading" hidden>
+  <div class="iv-title-row"><h1 id="settings-heading">Settings</h1><button id="settings-done" class="iv-text-button" type="button">Done<Icon name="check" /></button></div>
+  <section class="iv-setting-section" aria-labelledby="google-heading">
+    <h2 id="google-heading">Google Sheet</h2>
+    <p id="google-status" class="field-help" role="status">Connect your Google Sheet to keep customers, invoices and business details together.</p>
+    <button id="connect-google" class="iv-button iv-primary" type="button" disabled>Connect Google Sheet</button>
+    <p id="google-session-status" class="field-help" role="status" hidden>This browser could not remember the Google connection for this tab. Refreshing may require reconnecting.</p>
+    <p class="field-help">Records stay in your Sheet. Drafts are remembered on this device. <a class="privacy-link" href={`${import.meta.env.BASE_URL}privacy/`} target="_blank" rel="noopener noreferrer" aria-label="Privacy & data (opens in a new tab)">Privacy &amp; data</a></p>
+    <div id="sheet-setup" hidden>
+      <div id="existing-sheet-options" class="iv-sheet-choice">
+        <h3>Select your Sheet</h3>
+        <div id="known-sheet-options" class="sheet-existing" hidden><div><label for="existing-sheet">Your invoice Sheets</label><select id="existing-sheet"><option value="">Choose a workbook</option></select></div><button id="use-existing-sheet" class="iv-button iv-primary" type="button" disabled>Use Sheet</button></div>
+        <button id="choose-sheet" class="iv-button" type="button" disabled>Choose from Google Drive</button>
+        <p class="field-help">Choose an existing SheetInvoice workbook. Its General access must be Restricted.</p>
+      </div>
+      <details id="new-sheet-options" class="iv-notes"><summary>Starting fresh? Create a new Sheet</summary><form id="create-sheet-form" class="sheet-create"><div><label for="sheet-name">New Sheet name</label><input id="sheet-name" value="My invoices" required maxlength="100" /></div><button id="create-sheet" class="iv-button" type="submit">Create private Sheet</button></form></details>
+    </div>
+    <div id="sheet-connected" hidden><div class="iv-sheet-name"><Icon name="sheet" /><div><strong id="connected-sheet-name"></strong><a id="open-sheet" target="_blank" rel="noopener noreferrer">Open Google Sheet<Icon name="external" /></a></div><span class="iv-small-badge iv-badge-paid">Private</span></div><button id="refresh-sheet" class="iv-text-button" type="button">Refresh records</button></div>
+  </section>
+  <details id="business-defaults" class="iv-setting-section iv-settings-details" aria-labelledby="business-heading">
+    <summary><h2 id="business-heading">Business details</h2></summary>
+    <p class="field-help">Saved in your Sheet. Used automatically when opening or generating any invoice.</p>
+    <form id="business-form">
+      <div class="iv-field"><label for="seller-name">{SELLER_FIELDS.name.label}</label><input id="seller-name" name="sellerName" maxlength={SELLER_FIELDS.name.limit} required /></div>
+      <div class="iv-field"><label for="seller-address">{SELLER_FIELDS.address.label}</label><textarea id="seller-address" name="sellerAddress" rows="2" maxlength={SELLER_FIELDS.address.limit}></textarea></div>
+      <div class="iv-meta-grid iv-field"><div><label for="seller-phone-label">{SELLER_FIELDS.phoneLabel.label}</label><input id="seller-phone-label" name="sellerPhoneLabel" maxlength={SELLER_FIELDS.phoneLabel.limit} placeholder="Contact, Tel or WhatsApp" /></div><div><label for="seller-phone">{SELLER_FIELDS.phone.label}</label><input id="seller-phone" name="sellerPhone" type="tel" maxlength={SELLER_FIELDS.phone.limit} /></div></div>
+      <div class="iv-field"><label for="seller-payment">{SELLER_FIELDS.payment.label}</label><textarea id="seller-payment" name="sellerPayment" rows="2" maxlength={SELLER_FIELDS.payment.limit} placeholder="PayNow number and account name"></textarea></div>
+      <div class="iv-field">
+        <label for="seller-message-template">{SELLER_FIELDS.messageTemplate.label}</label>
+        <textarea id="seller-message-template" name="sellerMessageTemplate" rows="6" maxlength={SELLER_FIELDS.messageTemplate.limit} aria-describedby="message-template-help message-field-status" placeholder={'Hi {customer_name},\nYour invoice {invoice_number} for {total} is ready.\nThank you, {business_name}.'}></textarea>
+        <p id="message-template-help" class="field-help">Write the whole message. Fields fill in from each invoice automatically. Leave blank for the standard message.</p>
+        <div class="iv-message-fields" role="group" aria-label="Insert a message field"><span>Insert field</span>{Object.entries(WHATSAPP_FIELDS).slice(0, 3).map(([key, field]) => <button class="iv-button" type="button" data-message-field={key}>{field.label}</button>)}</div>
+        <details class="iv-notes"><summary>More message fields</summary><div class="iv-message-fields" role="group" aria-label="More message fields">{Object.entries(WHATSAPP_FIELDS).slice(3).map(([key, field]) => <button class="iv-button" type="button" data-message-field={key}>{field.label}</button>)}</div><p class="field-help">Payment instructions appear only for unpaid invoices. Full invoice summary inserts the standard message, including its payment and review details.</p></details>
+        <p id="message-field-status" class="field-help" role="status"></p>
+      </div>
+      <details class="iv-notes"><summary>More business details</summary>
+      <div class="iv-field"><label for="invoice-number-start">Start invoice numbers at</label><input id="invoice-number-start" name="invoiceNumberStart" maxlength="70" placeholder="e.g. 40108 or INV-0001" aria-describedby="numbering-help" /><p id="numbering-help" class="field-help">New invoices continue after the highest saved number in this series. Leave blank for automatic date-based numbers.</p><p id="numbering-warning" class="field-help" role="status" hidden></p></div>
+      <div class="iv-meta-grid"><div><label for="seller-contact">{SELLER_FIELDS.contact.label}</label><input id="seller-contact" name="sellerContact" maxlength={SELLER_FIELDS.contact.limit} /></div><div><label for="seller-email">{SELLER_FIELDS.email.label}</label><input id="seller-email" name="sellerEmail" type="email" maxlength={SELLER_FIELDS.email.limit} /></div></div>
+      <div class="iv-meta-grid iv-field"><div><label for="seller-registration-label">{SELLER_FIELDS.registrationLabel.label}</label><input id="seller-registration-label" name="sellerRegistrationLabel" maxlength={SELLER_FIELDS.registrationLabel.limit} placeholder="UEN / Registration No" /></div><div><label for="seller-registration">{SELLER_FIELDS.registration.label}</label><input id="seller-registration" name="sellerRegistration" maxlength={SELLER_FIELDS.registration.limit} /></div></div>
+      <p class="field-help">Labels appear before their values on PDF and JPG invoices. Leave a label blank to show just the value.</p>
+      <div class="iv-field"><label for="seller-terms">{SELLER_FIELDS.terms.label}</label><textarea id="seller-terms" name="sellerTerms" rows="2" maxlength={SELLER_FIELDS.terms.limit}></textarea></div>
+      <div class="iv-field"><label for="seller-signature">{SELLER_FIELDS.signature.label}</label><input id="seller-signature" name="sellerSignature" maxlength={SELLER_FIELDS.signature.limit} placeholder="Initials or name, e.g. KOH" aria-describedby="signature-help" /><p id="signature-help" class="field-help">Optional. Shown above the authorised signature line on PDF and JPG invoices. Leave blank for signing by hand.</p></div>
+      <div class="iv-field"><span id="signature-image-label" class="field-label">Signature image (optional)</span><input id="seller-signature-image" type="hidden" /><input id="signature-upload" type="file" accept="image/png,image/jpeg,image/webp" aria-labelledby="signature-image-label" hidden /><div class="sheet-actions"><button id="upload-signature" class="iv-button" type="button">Upload signature image</button><button id="remove-signature" class="iv-text-button" type="button" hidden>Remove image</button></div><img id="signature-preview" class="iv-signature-preview" alt="Your signature image" hidden /><p class="field-help">Use a cropped PNG, JPG or WebP. The image replaces the initials on the invoice and is saved in your own Sheet when you save business details.</p><p id="signature-status" class="field-help" role="status"></p><p id="signature-error" class="notice" role="alert" hidden></p></div>
+      <div class="iv-field"><label for="seller-review-url">{SELLER_FIELDS.reviewUrl.label}</label><input id="seller-review-url" name="sellerReviewUrl" type="url" maxlength={SELLER_FIELDS.reviewUrl.limit} placeholder="https://…" /><p class="field-help">Added to the standard message. Insert the Review link field to include it in a custom message.</p></div>
+      </details>
+      <button id="save-business-defaults" class="iv-button" type="submit" hidden>Save business details</button><p id="business-save-status" class="field-help" role="status"></p>
+    </form>
+  </details>
+  <details id="saved-items-settings" class="iv-setting-section iv-settings-details" aria-labelledby="saved-items-heading" hidden>
+    <summary><h2 id="saved-items-heading">Saved items</h2></summary>
+    <p class="field-help">Add your usual items or services in the Sheet’s Saved items tab: description, quantity and unit price in SGD. Leave the price blank to enter it per invoice.</p>
+    <p id="saved-items-status" class="field-help" role="status"></p>
+    <p id="saved-items-warning" class="notice" role="status" hidden></p>
+    <div class="sheet-actions"><button id="setup-saved-items" class="iv-button" type="button">Add saved items tab</button><a id="edit-saved-items" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
+    <p class="field-help">After editing the Sheet, select Refresh records above. Tap a saved-item tag below the customer details to add it. Tap again to increase the quantity.</p>
+  </details>
+  <details id="design-settings" class="iv-setting-section iv-settings-details" aria-labelledby="design-heading" hidden>
+    <summary><h2 id="design-heading">Invoice design</h2></summary>
+    <p class="field-help">Choose colours and left, centre or right text alignment in your Sheet’s Invoice design tab. Each setting includes its available options.</p>
+    <div class="sheet-actions"><button id="setup-design" class="iv-button" type="button">Add invoice design tab</button><a id="edit-design" class="iv-button" target="_blank" rel="noopener noreferrer" hidden>Edit in Google Sheet<Icon name="external" /></a></div>
+    <p class="field-help">After editing, select Refresh records. New invoices use this design. Saved invoices keep their original design.</p>
+    <p id="design-warning" class="notice" role="status" hidden></p>
+    <button id="apply-design" class="iv-text-button" type="button" hidden>Apply design to current invoice</button><p id="design-status" class="field-help" role="status"></p>
+  </details>
+  <div class="iv-settings-clear"><div class="iv-settings-actions"><button id="change-sheet" class="iv-text-button" type="button" disabled>Change Sheet</button><button id="disconnect-google" class="iv-text-button iv-danger-text" type="button" disabled>Disconnect</button><button id="clear-device" class="iv-text-button iv-danger-text" type="button">Clear this device’s data</button></div><p id="device-storage-status" class="field-help" role="status"></p></div>
+</section>

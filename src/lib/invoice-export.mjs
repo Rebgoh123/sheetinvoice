@@ -31,12 +31,13 @@ async function renderInvoice(invoice, asJpg) {
   pdf.setCreator("SheetInvoice");
   let page, y, bodyTop, bodyBottom;
   const pages = [];
+  let textCanvas, textContext;
   const encodable = (text, font) => { try { font.encodeText(text); return true; } catch { return false; } };
   const addPage = () => asJpg ? [] : pdf.addPage([W, H]);
 
   function canvasText(text, size, font) {
     if (typeof document === "undefined") throw new Error("Unicode customer text needs a browser to generate this invoice.");
-    const canvas = document.createElement("canvas"), context = canvas.getContext("2d");
+    const canvas = textCanvas ??= document.createElement("canvas"), context = textContext ??= canvas.getContext("2d");
     if (!context) throw new Error("Your browser could not render the invoice text.");
     context.font = `${font === bold || font === serif ? "700" : "400"} ${size}px ${canvasFonts}`;
     return { canvas, context, width: context.measureText(text).width };
@@ -213,6 +214,7 @@ async function renderInvoice(invoice, asJpg) {
     await draw("All amounts in SGD.", M, H - 24, 7, regular, accent);
     await draw(`${index + 1} / ${pages.length}`, W - M, H - 24, 7, regular, accent, "right");
   }
+  if (textCanvas) textCanvas.width = textCanvas.height = 1;
   if (!asJpg) return pdf.save();
   const canvas = document.createElement('canvas'), context = canvas.getContext('2d', { alpha: false });
   if (!context) throw new Error('Your browser could not create the invoice image.');
