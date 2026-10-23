@@ -81,8 +81,11 @@ function businessChanged(event) {
   if (event.target.id === 'signature-upload') return;
   readBusinessForm(); profileDirty = true;
   if (event.target.id !== 'invoice-number-start') {
-    invoice.seller = { ...business }; revision++; recordRevision = crypto.randomUUID(); dirty = true;
-    discardExport(); errors();
+    const viewingInvoice = activeView === 'settings' && previousView === 'pdf' && generated;
+    // Settings opened from a past invoice apply to that preview, preserving an unrelated draft.
+    if (!viewingInvoice?.record) { invoice.seller = { ...business }; revision++; recordRevision = crypto.randomUUID(); dirty = true; }
+    if (!viewingInvoice) discardExport();
+    errors();
   }
   persist();
   $('business-save-status').textContent = workbook ? 'Saved on this device. Save business details to update your Sheet.' : 'Remembered on this device. Connect a Sheet to sync your defaults.';
@@ -101,6 +104,7 @@ function showView(view, focus = true) {
     $(`${name}-tab`).tabIndex = selected || settingsReturn ? 0 : -1;
   }
   $('settings-button').setAttribute('aria-expanded', String(view === 'settings'));
+  if (view === 'pdf') updateBusinessPreviewControls();
   if (focus) {
     const heading = $(view === 'pdf' ? 'pdf-result' : `${view}-panel`).querySelector('h1');
     heading.tabIndex = -1; heading.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' });
@@ -230,7 +234,63 @@ function displayExport(result) {
   $('share-pdf').querySelector('span').textContent = canShare ? `Share ${formatLabel}${files.length > 1 ? ' pages' : ''}` : `Download ${formatLabel} to share`;
   $('share-help').textContent = canShare ? 'Choose WhatsApp from the share menu.'
     : files.length > 1 ? 'Download each JPG page, then attach the images in WhatsApp.' : `Download the ${formatLabel}, then attach it in WhatsApp.`;
+  updateBusinessPreviewControls();
 }
+const differentBusiness = (left, right) => JSON.stringify(normalizeSeller(left)) !== JSON.stringify(normalizeSeller(right));
+function updateBusinessPreviewControls() {
+  if (!generated) { $('invoice-business-update').hidden = true; return; }
+  const stalePreview = differentBusiness(generated.invoice.seller, business);
+  const changedRecord = generated.record && differentBusiness(generated.record.invoice.seller, generated.invoice.seller);
+  $('invoice-business-update').hidden = !stalePreview && !changedRecord && !generated.businessUpdated;
+  $('invoice-business-message').textContent = stalePreview
+    ? 'Your business details have changed. Apply your latest labels, contact details and signature to this invoice.'
+    : 'Business details updated in this preview. Save the invoice to keep these changes in your Sheet.';
+  $('update-invoice-business').textContent = stalePreview ? 'Use latest business details & save' : 'Save updated invoice';
+  $('update-invoice-business').disabled = googleBusy || generating || sharing || signatureBusy || !workbook;
+}
+async function finishSettings() {
+  if (generating || signatureBusy) return;
+  if (previousView !== 'pdf' || !generated || !differentBusiness(generated.invoice.seller, business)) { showView(previousView); return; }
+  const source = generated, epoch = connectionEpoch, snapshot = { ...structuredClone(source.invoice), seller: normalizeSeller(business) };
+  if (!source.record && differentBusiness(invoice.seller, business)) {
+    invoice.seller = { ...snapshot.seller }; revision++; recordRevision = crypto.randomUUID(); dirty = true;
+  }
+  generating = true; updateCloudControls();
+  try {
+    const output = await invoiceFiles(snapshot, source.format);
+    if (epoch !== connectionEpoch || generated !== source) return;
+    displayExport({ ...source, ...output, invoice: snapshot, savedToSheet: false, businessUpdated: true });
+    showView('pdf');
+  } catch { if (epoch === connectionEpoch) cloudError(new Error('The invoice preview could not refresh. Your business details are still here. Select Done to try again.')); }
+  finally { generating = false; updateCloudControls(); persist(); }
+}
+$('update-invoice-business').addEventListener('click', () => {
+  if (!generated || generating || sharing || signatureBusy || googleBusy) return;
+  if (!generated.record) {
+    invoice.seller = normalizeSeller(business); revision++; recordRevision = crypto.randomUUID(); dirty = true;
+    return completeInvoice();
+  }
+  const source = generated;
+  return cloudAction(async () => {
+    const epoch = connectionEpoch, snapshot = { ...structuredClone(source.invoice), seller: normalizeSeller(business) };
+    const key = JSON.stringify(snapshot.seller);
+    if (source.businessSave?.key !== key) source.businessSave = { key, revision: crypto.randomUUID() };
+    const record = { id: source.record.id, revision: source.businessSave.revision, baseRevision: source.record.revision, customerId: source.record.customerId, invoice: snapshot };
+    const saved = await sheets.save(workbook.id, record, { updateCustomer: false });
+    if (epoch !== connectionEpoch) return;
+    workbook = saved.workbook;
+    source.record = { ...source.record, revision: record.revision, invoice: snapshot };
+    if (recordId === record.id && baseRevision === record.baseRevision && recordWorkbookId === workbook.id) {
+      invoice.seller = { ...snapshot.seller }; baseRevision = record.revision;
+      recordRevision = dirty ? crypto.randomUUID() : record.revision; revision++; fillForm();
+    }
+    renderCloudRecords();
+    const output = await invoiceFiles(snapshot, source.format);
+    if (epoch !== connectionEpoch || generated !== source) return;
+    displayExport({ ...source, ...output, invoice: snapshot, savedToSheet: true, businessUpdated: false });
+    showView('pdf');
+  });
+});
 function changed(event) {
   if (event?.target?.id === 'export-format') return;
   if (event?.target?.id === 'invoice-number') automaticNumber = null;
@@ -377,6 +437,9 @@ async function completeInvoice({ exportFile = true } = {}) {
   $('google-error').hidden = true;
   if (!exportFile && !workbook) return;
   readForm(); errors();
+  if (!baseRevision && differentBusiness(invoice.seller, business)) {
+    invoice.seller = normalizeSeller(business); revision++; recordRevision = crypto.randomUUID(); dirty = true;
+  }
   if (!invoice.seller.name.trim()) {
     showView('settings'); $('business-defaults').open = true;
     $('business-save-status').textContent = 'Enter your business name for this invoice.';
@@ -460,8 +523,8 @@ document.querySelectorAll('[role=tab]').forEach((tab, index, tabs) => tab.addEve
   event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + 1) % tabs.length;
   tabs[next].click(); tabs[next].focus();
 }));
-$('settings-button').addEventListener('click', () => showView(activeView === 'settings' ? previousView : 'settings'));
-$('settings-done').addEventListener('click', () => showView(previousView));
+$('settings-button').addEventListener('click', () => activeView === 'settings' ? finishSettings() : showView('settings'));
+$('settings-done').addEventListener('click', finishSettings);
 document.addEventListener('invalid', event => {
   let details = event.target.closest('details');
   while (details) { details.open = true; details = details.parentElement.closest('details'); }
@@ -573,6 +636,8 @@ function updateCloudControls() {
   for (const id of ['create-sheet', 'refresh-sheet', 'change-sheet', 'save-business-defaults', 'setup-saved-items', 'setup-design', 'apply-design', 'disconnect-google']) $(id).disabled = googleBusy || generating;
   $('save-business-defaults').disabled ||= signatureBusy;
   for (const id of ['upload-signature', 'remove-signature']) $(id).disabled = signatureBusy || generating || googleBusy;
+  $('settings-done').disabled = signatureBusy || generating;
+  updateBusinessPreviewControls();
   $('save-business-defaults').textContent = workbook?.seller.name.trim() ? 'Save business details' : 'Save & start invoicing';
   $('apply-design').hidden = !workbook || JSON.stringify(normalizeDesign(invoice.design)) === JSON.stringify(workbook.design);
   updateSavedItemControl();
