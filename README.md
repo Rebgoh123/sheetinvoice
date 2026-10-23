@@ -37,7 +37,7 @@ One Google Cloud project can serve this app. A self-hosted fork needs credential
 1. Enable **Google Sheets API**, **Google Drive API** and **Google Picker API**.
 2. Create an OAuth client of type **Web application**. Add the website origin to **Authorized JavaScript origins**, for example `https://YOUR_USERNAME.github.io`. Origins contain no repository path. Add localhost only for development. This browser flow has no client secret or redirect endpoint.
 3. Configure consent for `openid`, `email` and `https://www.googleapis.com/auth/drive.file`. In Testing, only listed test users can connect. Review Google's production and branding requirements before making sign-in available to everyone.
-4. Create a browser API key restricted to **Google Picker API** and **Google Drive API**. Restrict website referrers to your deployed app, for example `https://YOUR_USERNAME.github.io/sheetinvoice/*`, and `https://docs.google.com/*` for Picker. Only add local referrers when developing.
+4. Create a browser API key restricted to **Google Picker API** and **Google Drive API**. Restrict website referrers to your deployed app, for example `https://YOUR_USERNAME.github.io/*`, and `https://docs.google.com/*` for Picker. Cross-origin browser requests may send only the origin, so allow your own Pages origin rather than a repository path. Only add local referrers when developing.
 5. Set these environment values locally, or GitHub Actions repository **Variables** for deployment:
 
 | Variable | Value |
