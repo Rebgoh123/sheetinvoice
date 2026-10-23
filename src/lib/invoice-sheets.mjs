@@ -1,4 +1,4 @@
-import { normalizeSeller, sellerLimits, priceInCents, restoreDraft, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber, invoiceNumberStartError } from './invoice.mjs';
+import { SELLER_FIELDS, normalizeSeller, sellerLimits, priceInCents, restoreDraft, validateInvoice, validateSeller, invoiceTotal, lineTotal, whatsappNumber, invoiceNumberStartError } from './invoice.mjs';
 import { DESIGN_SETTINGS, normalizeDesign, validateDesign } from './invoice-design.mjs';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -15,8 +15,11 @@ export const SAVED_ITEMS_HEADER = ['Description', 'Quantity', 'Unit price (SGD)'
 export const DESIGN_TAB = 'Invoice design';
 const optionalTables = { [SAVED_ITEMS_TAB]: SAVED_ITEMS_HEADER, [DESIGN_TAB]: ['Setting', 'Value', 'Options'] };
 const designRows = () => Object.values(DESIGN_SETTINGS).map(setting => [setting.label, setting.value, setting.options]);
-const businessKeys = { name: 'Business name', address: 'Business address', contact: 'Contact name', phone: 'Business phone', email: 'Business email', registration: 'UEN / registration', payment: 'Payment instructions', terms: 'Invoice footer', reviewUrl: 'Review link' };
-const businessRows = seller => Object.entries(businessKeys).map(([key, label]) => [label, normalizeSeller(seller)[key]]);
+const businessKeys = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.sheetKey ?? field.label]));
+const businessRows = seller => {
+  const profile = normalizeSeller(seller);
+  return Object.entries(businessKeys).map(([key, label]) => [label, profile[key]]);
+};
 const NUMBER_START = 'Invoice number start';
 const SHEETS = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
@@ -65,6 +68,7 @@ export function parseWorkbook(metadata, ranges) {
   for (const [key, label] of Object.entries(businessKeys)) {
     if (Object.hasOwn(settings, label)) seller[key] = String(settings[label] ?? '').slice(0, sellerLimits[key]);
   }
+  seller = normalizeSeller(seller);
   let optionalIndex = Object.keys(TABLES).length;
   const optional = Object.fromEntries(Object.keys(optionalTables).filter(title => Number.isInteger(tabs[title])).map(title => [title, ranges[optionalIndex++]?.values || []]));
   const catalog = parseSavedItems(optional[SAVED_ITEMS_TAB]);

@@ -1,5 +1,5 @@
 import {
-  MAX_ITEMS, newInvoice, normalizeSeller, validateSeller, invoiceTotal, lineTotal,
+  MAX_ITEMS, SELLER_FIELDS, newInvoice, normalizeSeller, validateSeller, invoiceTotal, lineTotal,
   formatMoney, displayDate, validateInvoice, invoiceSummary, whatsappUrl, invoiceFilename, priceInCents,
   nextInvoiceNumber, invoiceNumberStartError,
 } from "./invoice.mjs";
@@ -39,7 +39,7 @@ const sheetDesign = () => workbook?.design ?? cachedDesign;
 const fields = {
   "customer-name": ["customer", "name"], "customer-phone": ["customer", "phone"], "customer-address": ["customer", "address"],
 };
-const sellerFields = { name: 'seller-name', address: 'seller-address', contact: 'seller-contact', phone: 'seller-phone', email: 'seller-email', registration: 'seller-registration', payment: 'seller-payment', terms: 'seller-terms', reviewUrl: 'seller-review-url' };
+const sellerFields = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.id]));
 function fillBusinessForm() {
   for (const [key, id] of Object.entries(sellerFields)) $(id).value = business[key];
   $('invoice-number-start').value = numberStart;
@@ -128,7 +128,7 @@ function readForm() {
 function persist() {
   if (googleUser) cacheAccountId = googleUser.id;
   if (workbook) { cachedItems = workbook.savedItems; cachedDesign = normalizeDesign(workbook.design); }
-  const hasData = exportFormat !== 'pdf' || dirty || profileDirty || recordWorkbookId || Object.values(business).some(value => value.trim()) || cachedItems.length || Object.values(invoice.customer).some(value => value.trim()) || invoice.items.some(item => !isBlankItem(item)) || invoice.notes.trim();
+  const hasData = exportFormat !== 'pdf' || dirty || profileDirty || recordWorkbookId || Object.entries(business).some(([key, value]) => !SELLER_FIELDS[key].isLabel && value.trim()) || cachedItems.length || Object.values(invoice.customer).some(value => value.trim()) || invoice.items.some(item => !isBlankItem(item)) || invoice.notes.trim();
   deviceSaved = saveDevice(hasData ? { invoice, business, exportFormat, numberStart, automaticNumber, design: cachedDesign, savedItems: cachedItems, accountId: cacheAccountId, workbookId: recordWorkbookId,
     recordId, recordRevision, baseRevision, customerId, dirty, profileDirty } : null);
   $('device-storage-status').textContent = deviceSaved ? '' : 'This browser could not save on this device. Keep the tab open or save to Google Sheets.';

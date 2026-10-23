@@ -47,7 +47,7 @@ export function loadDevice(storage) {
     if (!raw || raw.length > 150000) return null;
     const saved = JSON.parse(raw);
     if (saved.version !== 1) return null;
-    const invoice = restoreDraft(JSON.stringify({ version: 1, invoice: saved.invoice }));
+    const invoice = restoreDraft(JSON.stringify({ version: 1, invoice: saved.invoice }), { preserveLegacyLabels: uuid(saved.baseRevision) });
     if (!invoice || !invoice.items.length) return null;
     const accountId = typeof saved.accountId === 'string' && /^[a-zA-Z0-9_-]{1,200}$/.test(saved.accountId) ? saved.accountId : null;
     const workbookId = accountId && fileId(saved.workbookId) ? saved.workbookId : null;

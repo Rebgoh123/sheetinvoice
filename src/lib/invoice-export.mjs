@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { formatMoney, invoiceTotal, lineTotal, priceInCents, validateInvoice, displayDate } from "./invoice.mjs";
+import { formatMoney, invoiceTotal, lineTotal, priceInCents, validateInvoice, displayDate, sellerHeaderLines } from "./invoice.mjs";
 import { normalizeDesign } from './invoice-design.mjs';
 
 const W = 595.28, H = 841.89, M = 32, ROW = 22;
@@ -99,8 +99,7 @@ async function renderInvoice(invoice, asJpg) {
       await aligned(text, M, W - M, top, titleSize, serif, accent, design.businessAlign); top += titleSize + 5;
     }
     top += 5;
-    const details = [invoice.seller.address, [invoice.seller.contact, invoice.seller.phone].filter(Boolean).join(' | '), invoice.seller.email, invoice.seller.registration.trim() ? `Registration: ${invoice.seller.registration.trim()}` : ''];
-    for (const detail of details) if (detail.trim()) {
+    for (const detail of sellerHeaderLines(invoice.seller)) {
       for (const text of wrap(paragraph(detail), headingWidth, 10)) {
         await aligned(text, M, W - M, top, 10, regular, accent, design.businessAlign); top += 15;
       }

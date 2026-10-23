@@ -1,19 +1,43 @@
 import { normalizeDesign } from './invoice-design.mjs';
 
 export const MAX_ITEMS = 40;
-export const defaultSeller = {
-  name: "", address: "", contact: "", phone: "", email: "",
-  registration: "", payment: "", terms: "", reviewUrl: "",
+// One definition for the form, readable Sheet settings and stored invoice profiles.
+export const SELLER_FIELDS = {
+  name: { label: 'Business name', id: 'seller-name', limit: 120 },
+  address: { label: 'Business address', id: 'seller-address', limit: 240 },
+  contact: { label: 'Contact name', id: 'seller-contact', limit: 50 },
+  phoneLabel: { label: 'Phone label', id: 'seller-phone-label', limit: 40, default: 'Contact', isLabel: true },
+  phone: { label: 'Phone number', sheetKey: 'Business phone', id: 'seller-phone', limit: 60 },
+  email: { label: 'Business email', id: 'seller-email', limit: 120 },
+  registrationLabel: { label: 'Registration label', id: 'seller-registration-label', limit: 40, default: 'UEN / Registration No', isLabel: true },
+  registration: { label: 'Registration number', sheetKey: 'UEN / registration', id: 'seller-registration', limit: 80 },
+  payment: { label: 'Payment instructions', id: 'seller-payment', limit: 800 },
+  terms: { label: 'Invoice footer', id: 'seller-terms', limit: 240 },
+  reviewUrl: { label: 'Review link (optional)', sheetKey: 'Review link', id: 'seller-review-url', limit: 1000 },
 };
-export const sellerLimits = { name: 120, address: 240, contact: 50, phone: 60, email: 120, registration: 80, payment: 800, terms: 240, reviewUrl: 1000 };
+export const defaultSeller = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.default ?? '']));
+export const sellerLimits = Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => [key, field.limit]));
 export function normalizeSeller(source) {
-  return Object.fromEntries(Object.entries(defaultSeller).map(([key, fallback]) => [key, typeof source?.[key] === "string" ? source[key].slice(0, sellerLimits[key]) : fallback]));
+  return Object.fromEntries(Object.entries(SELLER_FIELDS).map(([key, field]) => {
+    const value = typeof source?.[key] === 'string' ? source[key] : field.default ?? '';
+    return [key, (field.isLabel ? value.replace(/\s+/g, ' ').trim() : value).slice(0, field.limit)];
+  }));
+}
+export function sellerHeaderLines(source) {
+  const seller = normalizeSeller(source);
+  const labelled = (label, value) => {
+    if (!value.trim()) return '';
+    const prefix = label.replace(/[:：]+\s*$/u, '').trim();
+    return prefix ? `${prefix}: ${value.trim()}` : value.trim();
+  };
+  return [seller.address, [seller.contact.trim(), labelled(seller.phoneLabel, seller.phone)].filter(Boolean).join(' | '),
+    seller.email, labelled(seller.registrationLabel, seller.registration)].filter(value => value.trim());
 }
 export function validateSeller(seller) {
   const errors = [];
   if (typeof seller?.name !== 'string' || !seller.name.trim()) errors.push('Enter your business name in Settings.');
   for (const [key, limit] of Object.entries(sellerLimits)) {
-    if (typeof seller?.[key] !== 'string' || seller[key].length > limit) errors.push(`Business ${key} is too long or invalid.`);
+    if (typeof seller?.[key] !== 'string' || seller[key].length > limit) errors.push(`${SELLER_FIELDS[key].label} is too long or invalid.`);
   }
   if (seller?.reviewUrl?.trim()) {
     try {
@@ -115,9 +139,6 @@ export function validateInvoice(invoice) {
   });
   for (const [value, max, label] of [
     [invoice.customer?.address, 400, "Service address"], [invoice.customer?.phone, 40, "Customer phone"],
-    [invoice.seller?.phone, 60, "Business phone"], [invoice.seller?.email, 120, "Business email"],
-    [invoice.seller?.registration, 80, "Business registration"], [invoice.seller?.payment, 800, "Payment instructions"],
-    [invoice.seller?.address, 240, "Business address"], [invoice.seller?.contact, 50, "Contact name"], [invoice.seller?.terms, 240, "Invoice footer"],
     [invoice.notes, 1200, "Notes"],
   ]) if (typeof value !== "string" || value.length > max) errors.push(`${label} is too long or invalid.`);
   return errors;
@@ -131,7 +152,7 @@ export function invoiceSummary(invoice) {
     "", `Total: ${formatMoney(invoiceTotal(invoice))}`,
     `Payment status: ${invoice.status === 'paid' ? 'Paid' : 'Unpaid'}`,
     ...(invoice.status !== 'paid' && invoice.seller.payment.trim() ? ["", invoice.seller.payment.trim()] : []),
-    "", "Please see the PDF invoice for details.", `Thank you, ${invoice.seller.name.trim()}.`,
+    "", "Please see the invoice for details.", `Thank you, ${invoice.seller.name.trim()}.`,
     ...(invoice.seller.reviewUrl?.trim() ? ["", "We'd appreciate a review of our service:", invoice.seller.reviewUrl.trim()] : []),
   ].join("\n");
 }
@@ -148,7 +169,7 @@ export function invoiceFilename(invoice, format = 'pdf', page = null) {
 }
 
 // Only restore the shape we own, with length limits; stored data never becomes HTML.
-export function restoreDraft(raw) {
+export function restoreDraft(raw, { preserveLegacyLabels = true } = {}) {
   try {
     const saved = JSON.parse(raw);
     if (saved.version !== 1 || !saved.invoice || !Array.isArray(saved.invoice.items)) return null;
@@ -159,7 +180,10 @@ export function restoreDraft(raw) {
       number: take(source.number, 70), date: take(source.date, 10),
       status: source.status || 'unpaid',
       customer: { name: take(source.customer?.name, 120), phone: take(source.customer?.phone, 40), address: take(source.customer?.address, 400) },
-      seller: normalizeSeller(source.seller),
+      seller: normalizeSeller({ ...source.seller, ...(preserveLegacyLabels ? {
+        // Historical snapshots predate configurable labels; retain their printed wording.
+        phoneLabel: source.seller?.phoneLabel ?? '', registrationLabel: source.seller?.registrationLabel ?? 'Registration',
+      } : {}) }),
       design: normalizeDesign(source.design),
       items: source.items.slice(0, MAX_ITEMS).map((item) => ({ description: take(item?.description, 240), quantity: take(item?.quantity, 3, "1"), price: take(item?.price, 10) })),
       notes: take(source.notes, 1200),

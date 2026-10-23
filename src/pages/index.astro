@@ -1,5 +1,6 @@
 ---
 import Icon from '../components/InvoiceIcon.astro';
+import { SELLER_FIELDS } from '../lib/invoice.mjs';
 import '../styles/invoice.css';
 const title = 'SheetInvoice';
 const canonical = Astro.site ? new URL(import.meta.env.BASE_URL, Astro.site).href : null;
@@ -102,16 +103,17 @@ const googleConfig = {
               <summary><h2 id="business-heading">Business details</h2></summary>
               <p class="field-help">Your details for new invoices. Saved in your Sheet.</p>
               <form id="business-form">
-                <div class="iv-field"><label for="seller-name">Business name</label><input id="seller-name" name="sellerName" maxlength="120" required /></div>
-                <div class="iv-field"><label for="seller-address">Business address</label><textarea id="seller-address" name="sellerAddress" rows="2" maxlength="240"></textarea></div>
-                <div class="iv-field"><label for="seller-phone">Business phone</label><input id="seller-phone" name="sellerPhone" type="tel" maxlength="60" /></div>
-                <div class="iv-field"><label for="seller-payment">Payment instructions</label><textarea id="seller-payment" name="sellerPayment" rows="2" maxlength="800" placeholder="PayNow number and account name"></textarea></div>
+                <div class="iv-field"><label for="seller-name">{SELLER_FIELDS.name.label}</label><input id="seller-name" name="sellerName" maxlength={SELLER_FIELDS.name.limit} required /></div>
+                <div class="iv-field"><label for="seller-address">{SELLER_FIELDS.address.label}</label><textarea id="seller-address" name="sellerAddress" rows="2" maxlength={SELLER_FIELDS.address.limit}></textarea></div>
+                <div class="iv-meta-grid iv-field"><div><label for="seller-phone-label">{SELLER_FIELDS.phoneLabel.label}</label><input id="seller-phone-label" name="sellerPhoneLabel" maxlength={SELLER_FIELDS.phoneLabel.limit} placeholder="Contact, Tel or WhatsApp" /></div><div><label for="seller-phone">{SELLER_FIELDS.phone.label}</label><input id="seller-phone" name="sellerPhone" type="tel" maxlength={SELLER_FIELDS.phone.limit} /></div></div>
+                <div class="iv-field"><label for="seller-payment">{SELLER_FIELDS.payment.label}</label><textarea id="seller-payment" name="sellerPayment" rows="2" maxlength={SELLER_FIELDS.payment.limit} placeholder="PayNow number and account name"></textarea></div>
                 <details class="iv-notes"><summary>More business details</summary>
                 <div class="iv-field"><label for="invoice-number-start">Start invoice numbers at</label><input id="invoice-number-start" name="invoiceNumberStart" maxlength="70" placeholder="e.g. 40108 or INV-0001" aria-describedby="numbering-help" /><p id="numbering-help" class="field-help">New invoices continue after the highest saved number in this series. Leave blank for automatic date-based numbers.</p><p id="numbering-warning" class="field-help" role="status" hidden></p></div>
-                <div class="iv-meta-grid"><div><label for="seller-contact">Contact name</label><input id="seller-contact" name="sellerContact" maxlength="50" /></div><div><label for="seller-email">Business email</label><input id="seller-email" name="sellerEmail" type="email" maxlength="120" /></div></div>
-                <div class="iv-field"><label for="seller-registration">UEN / registration</label><input id="seller-registration" name="sellerRegistration" maxlength="80" /></div>
-                <div class="iv-field"><label for="seller-terms">Invoice footer</label><textarea id="seller-terms" name="sellerTerms" rows="2" maxlength="240"></textarea></div>
-                <div class="iv-field"><label for="seller-review-url">Review link (optional)</label><input id="seller-review-url" name="sellerReviewUrl" type="url" maxlength="1000" placeholder="https://…" /><p class="field-help">Included in the WhatsApp message when filled in.</p></div>
+                <div class="iv-meta-grid"><div><label for="seller-contact">{SELLER_FIELDS.contact.label}</label><input id="seller-contact" name="sellerContact" maxlength={SELLER_FIELDS.contact.limit} /></div><div><label for="seller-email">{SELLER_FIELDS.email.label}</label><input id="seller-email" name="sellerEmail" type="email" maxlength={SELLER_FIELDS.email.limit} /></div></div>
+                <div class="iv-meta-grid iv-field"><div><label for="seller-registration-label">{SELLER_FIELDS.registrationLabel.label}</label><input id="seller-registration-label" name="sellerRegistrationLabel" maxlength={SELLER_FIELDS.registrationLabel.limit} placeholder="UEN / Registration No" /></div><div><label for="seller-registration">{SELLER_FIELDS.registration.label}</label><input id="seller-registration" name="sellerRegistration" maxlength={SELLER_FIELDS.registration.limit} /></div></div>
+                <p class="field-help">Labels appear before their values on PDF and JPG invoices. Leave a label blank to show just the value.</p>
+                <div class="iv-field"><label for="seller-terms">{SELLER_FIELDS.terms.label}</label><textarea id="seller-terms" name="sellerTerms" rows="2" maxlength={SELLER_FIELDS.terms.limit}></textarea></div>
+                <div class="iv-field"><label for="seller-review-url">{SELLER_FIELDS.reviewUrl.label}</label><input id="seller-review-url" name="sellerReviewUrl" type="url" maxlength={SELLER_FIELDS.reviewUrl.limit} placeholder="https://…" /><p class="field-help">Included in the WhatsApp message when filled in.</p></div>
                 </details>
                 <button id="save-business-defaults" class="iv-button" type="submit" hidden>Save business details</button><p id="business-save-status" class="field-help" role="status"></p>
               </form>
