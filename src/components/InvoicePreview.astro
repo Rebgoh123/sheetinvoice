@@ -4,16 +4,17 @@ import Icon from './InvoiceIcon.astro';
 <section id="pdf-result" class="iv-panel" aria-labelledby="result-heading" hidden>
   <div class="iv-export-navigation"><button id="result-back" class="iv-text-button" type="button">Back to invoice</button><button id="edit-invoice" class="iv-text-button" type="button" hidden>Edit invoice</button></div>
   <h1 id="result-heading" tabindex="-1">Invoice ready</h1>
-  <div class="pdf-file"><Icon name="invoice" /><div><strong id="result-filename"></strong><p id="result-description"></p></div><span id="result-payment-status" class="iv-small-badge"></span></div>
-  <p id="sheet-save-status" class="field-help" role="status"></p>
-  <p class="field-help iv-preview-profile">Uses your latest business details, labels and signature.</p>
-  <div class="iv-export-toolbar">
-    <div class="iv-export-format"><span id="result-format-label">File format</span><div class="iv-status-filters" role="group" aria-labelledby="result-format-label"><button type="button" data-export-format="pdf" aria-pressed="true">PDF</button><button type="button" data-export-format="jpg" aria-pressed="false">JPG</button></div></div>
-    <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button"><Icon name="share" /><span>Share PDF</span></button><a id="download-pdf" class="iv-button" download><span>Download</span><Icon name="download" /></a></div>
+  <div class="pdf-file">
+    <div class="iv-file-summary"><div class="iv-file-title"><strong id="result-filename"></strong><span id="result-payment-status" class="iv-small-badge"></span></div><p id="result-description"></p></div>
+    <div class="iv-export-toolbar">
+      <div class="iv-status-filters" role="group" aria-label="File format"><button type="button" data-export-format="pdf" aria-pressed="true">PDF</button><button type="button" data-export-format="jpg" aria-pressed="false">JPG</button></div>
+      <div class="pdf-actions"><button id="share-pdf" class="iv-button iv-primary" type="button" title="Share invoice"><Icon name="share" /><span class="sr-only">Share PDF</span></button><a id="download-pdf" class="iv-button" title="Save invoice" download><span class="sr-only">Download</span><Icon name="download" /></a></div>
+    </div>
   </div>
+  <p id="sheet-save-status" class="field-help" role="status"></p>
   <p id="result-format-status" class="field-help" role="status"></p>
   <p id="result-error" class="notice" role="alert" hidden></p>
-  <p id="share-help" class="field-help"></p><p id="share-status" class="field-help" role="status"></p>
+  <p id="share-status" class="field-help" role="status"></p>
   <h2 class="iv-preview-heading">Invoice preview</h2>
   <p id="preview-unavailable" class="field-help" hidden>The preview could not load. You can still save or share the PDF.</p>
   <div id="image-page-controls" class="history-pagination" hidden><button id="image-previous" class="iv-text-button" type="button">Previous page</button><span id="image-page" role="status"></span><button id="image-next" class="iv-text-button" type="button">Next page</button></div>

@@ -151,10 +151,8 @@ body { margin:0; }
 .invoice-app .iv-export-navigation { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
 .invoice-app .iv-signature-preview { display:block; max-width:240px; width:100%; height:80px; object-fit:contain; object-position:left center; margin-top:12px; border:1px solid var(--iv-line); background:white; }
 .invoice-app #result-heading { margin-bottom:20px; overflow-wrap:anywhere; }
-.invoice-app .iv-export-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px 20px; margin-top:20px; }
-.invoice-app .iv-export-format { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:12px; }
-.invoice-app #result-format-status:empty { display:none; }
-.invoice-app .iv-preview-profile { margin-top:12px; }
+.invoice-app .iv-export-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+.invoice-app #result-format-status:empty,.invoice-app #share-status:empty { display:none; }
 .invoice-app .iv-sheet-choice { margin-top:20px; }
 .invoice-app .iv-sheet-choice h3 { font-size:14px; margin:0 0 12px; }
 .invoice-app .iv-sheet-choice .sheet-existing { margin-bottom:12px; }
@@ -164,12 +162,14 @@ body { margin:0; }
 .invoice-app .iv-dialog::backdrop { background:#15252270; }
 .invoice-app .iv-dialog h2 { font-size:19px; margin-bottom:12px; }
 .invoice-app .iv-dialog .sheet-actions { justify-content:end; margin-top:24px; }
-.invoice-app .pdf-file { display:flex; align-items:center; gap:15px; padding:20px 0; border-block:1px solid var(--iv-line); }
-.invoice-app .pdf-file>svg { width:30px; height:30px; color:var(--iv-accent); flex-shrink:0; }
-.invoice-app .pdf-file>div { flex:1; min-width:0; overflow-wrap:anywhere; }
-.invoice-app .pdf-file strong { font-weight:500; font-size:14px; }
+.invoice-app .pdf-file { display:flex; align-items:center; flex-wrap:wrap; gap:16px; padding:16px 0; border-block:1px solid var(--iv-line); }
+.invoice-app .iv-file-summary { flex:1; min-width:0; overflow-wrap:anywhere; }
+.invoice-app .iv-file-title { display:flex; align-items:center; gap:8px; }
+.invoice-app .iv-file-title strong { min-width:0; font-weight:500; font-size:14px; }
+.invoice-app .iv-file-title .iv-small-badge { flex-shrink:0; }
 .invoice-app .pdf-file p { color:var(--iv-muted); font-size:12px; margin-top:4px; }
-.invoice-app .pdf-actions { display:flex; gap:10px; flex-wrap:wrap; margin-left:auto; }
+.invoice-app .pdf-actions { display:flex; gap:8px; }
+.invoice-app .pdf-actions>.iv-button { width:44px; min-width:44px; min-height:44px; padding:0; }
 .invoice-app .iv-preview-heading { margin-top:24px; font-size:14px; }
 .invoice-app .invoice-image-preview { display:block; width:100%; height:auto; margin-top:12px; border:1px solid var(--iv-line); background:white; }
 .invoice-app .summary-area { border-top:1px solid var(--iv-line); padding-top:15px; margin-top:22px; }
@@ -184,6 +184,8 @@ body { margin:0; }
 .invoice-app .privacy-content li+li { margin-top:10px; }
 
 @container (max-width:650px) {
+  .invoice-app .iv-file-summary { flex-basis:100%; }
+  .invoice-app .iv-export-toolbar { width:100%; justify-content:space-between; }
   .invoice-app .iv-item-head { display:none; }
   .invoice-app .iv-item { grid-template-columns:1fr 1fr 1fr 36px; padding:0 0 18px; }
   .invoice-app .iv-item>div:first-child { grid-column:1/-1; }
@@ -232,8 +234,6 @@ body { margin:0; }
   .invoice-app .iv-status-filters button { flex:1; min-height:44px; }
   .invoice-app .sheet-create>div,.invoice-app .sheet-existing>div { flex-basis:100%; min-width:0; }
   .invoice-app .sheet-create .iv-button,.invoice-app .sheet-existing .iv-button { width:100%; }
-  .invoice-app .iv-export-toolbar .pdf-actions { width:100%; margin-left:0; }
-  .invoice-app .pdf-actions>.iv-button { flex:1; min-width:0; white-space:normal; }
 }
 
 @container (max-width:360px) {

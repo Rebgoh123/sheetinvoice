@@ -233,8 +233,6 @@ function displayExport(result) {
   $('sheet-save-status').hidden = !!record;
   const canShare = supportsFileShare(files);
   $('share-pdf').querySelector('span').textContent = canShare ? `Share ${formatLabel}${files.length > 1 ? ' pages' : ''}` : `Download ${formatLabel} to share`;
-  $('share-help').textContent = canShare ? 'Choose WhatsApp from the share menu.'
-    : files.length > 1 ? 'Download each JPG page, then attach the images in WhatsApp.' : `Download the ${formatLabel}, then attach it in WhatsApp.`;
 }
 async function refreshBusiness() {
   if (!sheets || !workbook) return;
@@ -516,7 +514,7 @@ $("share-pdf").addEventListener("click", async () => {
   try {
     // File is prepared before this click, preserving the required user gesture.
     await navigator.share({ files, title: `Invoice ${generated.invoice.number}`, text: invoiceSummary(generated.invoice) });
-    $("share-status").textContent = "Share menu closed. Check WhatsApp to confirm the invoice was sent.";
+    $("share-status").textContent = "Share menu closed.";
   } catch (error) {
     $("share-status").textContent = error.name === "AbortError"
       ? `Sharing cancelled. Your ${formatLabel} is still ready.`
